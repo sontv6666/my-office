@@ -37,6 +37,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
+import { createMyDesk } from './mydesk.mjs';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
 
@@ -225,8 +226,10 @@ const COUNT_OF = { Read: 'read', NotebookRead: 'read', Grep: 'read', Glob: 'read
 const DEPLOY_RE = /\bgit\s+push\b[^\n;|&]*?\b(v\d+\.\d+\.\d+)\b/;
 
 /* ---------- state ---------- */
-const sessions = new Map(); // key ('p<pid>' or 's<sessionId>') -> session
+const sessions = new Map(); // key ('p<pid>', 's<sessionId>', or 'x<id>' for another CLI's agent from MyDesk) -> session
 const sidToKey = new Map();
+// Linked to MyDesk (server/mydesk.mjs): MyDesk says which sessions are in, so its 2D office and this one show the same people.
+const mydesk = createMyDesk({ dataDir: DATA_DIR, onChange: (cast) => { syncCast(cast).catch((err) => console.error('mydesk', err)); } });
 let feed = [];
 let seq = 0;
 const today = () => new Date().toLocaleDateString('sv-SE');
@@ -287,7 +290,7 @@ function freeDesk() {
   return -1;
 }
 const pubSub = (x) => ({ id: x.id, type: x.type, desc: x.desc || '', last: x.last || null, startedAt: x.startedAt, endedAt: x.endedAt || null, steps: x.steps || 0 });
-const pub = (s) => ({ id: s.id, pid: s.pid, name: s.name, title: s.title || '', dir: tilde(s.cwd), link: s.link, desk: s.desk, status: s.status, lastPrompt: s.lastPrompt && oneLine(unwrapPaste(s.lastPrompt)),
+const pub = (s) => ({ id: s.id, pid: s.pid, agent: s.agent || undefined, name: s.name, title: s.title || '', dir: tilde(s.cwd), link: s.link, desk: s.desk, status: s.status, lastPrompt: s.lastPrompt && oneLine(unwrapPaste(s.lastPrompt)),
   taskStart: s.taskStart, counts: s.counts, subs: Object.values(s.subs).map(pubSub), doneSubs: (s.doneSubs || []).map(pubSub), last: s.last, acct: acctOf(s),
   entry: s.entry || '', moved: s.parked ? { to: acctShown(s.parked.to), at: s.parked.at } : null,
   lastAt: s.lastEventAt || s.createdAt, doneAt: s.doneAt || 0, todos: s.todos || [], lastReply: s.lastReply || '', origin: s.origin || '',
@@ -819,6 +822,7 @@ async function doScan() {
     let j;
     try { j = JSON.parse(await fsp.readFile(path.join(SESS_DIR, f), 'utf8')); } catch { continue; }
     if (!j.pid || !alive(j.pid) || !(await sameProcess(j))) continue;
+    if (!mydesk.allows(j.sessionId)) continue;   // (linked to MyDesk: a session it does not list stays out)
     const key = 'p' + j.pid;
     live.add(key);
     let s = sessions.get(key);
@@ -828,6 +832,7 @@ async function doScan() {
       if (prevKey && sessions.has(prevKey)) { s = sessions.get(prevKey); sessions.delete(prevKey); s.key = key; unpark(s); }
       else { s = newSession(key); s.createdAt = j.startedAt || Date.now(); }
       sessions.set(key, s);
+      dropStandIn(j.sessionId);
       changed = true;
     }
     if (j.sessionId && s.sid !== j.sessionId) { if (s.sid) sidToKey.delete(s.sid); s.sid = j.sessionId; changed = true; }
@@ -889,6 +894,49 @@ async function recallTask(s) {
   if (s.status === 'rest') s.doneAt = items.at(-1)?.ts || 0;
   broadcast({ k: 'sess', s: pub(s) });
 }
+/* ---------- MyDesk's cast (server/mydesk.mjs) ---------- */
+// A session's first hooks can come before MyDesk lists it: kept a minute, replayed when it does.
+const held = new Map();   // sessionId -> [[at, payload]]
+function holdHook(p) {
+  const l = held.get(p.session_id) || [];
+  l.push([Date.now(), p]);
+  held.set(p.session_id, l.slice(-40));
+}
+// (a Claude session MyDesk lists that the office has itself: the real one, no stand-in)
+const ownSession = (x) => !x.agent && !!bySid(x.id);
+async function syncCast(cast) {
+  for (const [key, s] of sessions) {
+    if (s.external ? !cast?.external.some((x) => 'x' + x.id === key && !ownSession(x)) : !mydesk.allows(s.sid)) dropSession(key, s);
+  }
+  if (!cast) { held.clear(); await scanSessions(); return; }   // (MyDesk gone: every session again)
+  if ([...cast.claude].some((sid) => !bySid(sid))) await scanSessions();
+  for (const sid of cast.claude) {
+    const l = held.get(sid);
+    if (!l) continue;
+    held.delete(sid);
+    for (const [, p] of l) await onHook(p);
+  }
+  const old = Date.now() - 60_000;
+  for (const [sid, l] of held) if (l.at(-1)[0] < old) held.delete(sid);
+  for (const x of cast.external) if (!ownSession(x)) upsertExternal(x);
+}
+// The office found a session itself: its stand-in from MyDesk's record goes.
+function dropStandIn(sid) {
+  const st = sid && sessions.get('x' + sid);
+  if (st) dropSession('x' + sid, st);
+}
+// Another CLI's agent (Codex, Gemini…), or a Claude session not found here yet: MyDesk's record is all there is.
+function upsertExternal(x) {
+  const key = 'x' + x.id, now = Date.now();
+  let s = sessions.get(key);
+  if (!s) { s = newSession(key); s.external = true; s.agent = x.agent; sessions.set(key, s); }
+  const last = x.tool ? { type: classify(x.tool).type, label: clip(redact(oneLine(x.tool)), 40) } : null;   // (MyDesk sends the tool's name only)
+  if (s.name === x.name && s.cwd === x.cwd && s.status === x.status && JSON.stringify(s.last) === JSON.stringify(last)) return;
+  if (x.status === 'work' && s.status !== 'work') s.taskStart = now;
+  if (x.status === 'rest' && s.status !== 'rest') { s.doneAt = now; s.taskStart = 0; }
+  s.name = x.name; s.cwd = x.cwd; s.status = x.status; s.last = last; s.lastEventAt = now;
+  broadcast({ k: 'sess', s: pub(s) });
+}
 function dropSession(key, s) {
   if (s.fromFile && !taskSids.has(s.sid) && !s.viaOffice) chat.onLeft(s.title || s.name);
   sessions.delete(key);
@@ -902,9 +950,9 @@ setInterval(() => {
   for (const [key, s] of sessions) {
     // Claude went quiet without a Stop event (e.g. interrupted): let the chibi rest. A long tool run (a build, a test
     // suite) is not quiet; a tool still open after 10 minutes probably lost its PostToolUse.
-    if (s.status === 'work' && !s.busy && (!s.inTool || now - s.lastEventAt > 600_000) && now - s.lastEventAt > 20_000) { s.status = 'rest'; broadcast({ k: 'sess', s: pub(s) }); }
+    if (s.status === 'work' && !s.external && !s.busy && (!s.inTool || now - s.lastEventAt > 600_000) && now - s.lastEventAt > 20_000) { s.status = 'rest'; broadcast({ k: 'sess', s: pub(s) }); }
     // Sessions seen only through hooks (no session file) leave after 10 quiet minutes.
-    if (!s.fromFile && now - s.lastEventAt > 600_000) dropSession(key, s);
+    if (!s.fromFile && !s.external && now - s.lastEventAt > 600_000) dropSession(key, s);
     // A subagent that went quiet is finished: 90 s once its session rests, 5 min while the session still works.
     for (const [id, sub] of Object.entries(s.subs)) if (now - sub.seenAt > (s.status === 'rest' ? 90_000 : 300_000)) { finishSub(s, id, now); broadcast({ k: 'sess', s: pub(s) }); }
   }
@@ -945,6 +993,7 @@ async function onHook(p) {
   const ev = p.hook_event_name, sid = p.session_id;
   if (!ev || !sid) return;
   const loopSig = loops.onEvent(p);   // (at once, before anything awaited: the next call's check must already know)
+  if (!mydesk.allows(sid)) { holdHook(p); return; }
   rollDay();
   let s = bySid(sid);
   if (!s) { await scanSessions(); s = bySid(sid); }
@@ -953,6 +1002,7 @@ async function onHook(p) {
     s = newSession(key);
     s.sid = sid; s.cwd = p.cwd || ''; s.name = `${base(p.cwd) || 'claude'}-${sid.slice(0, 2)}`; noteDir(s.cwd);
     sessions.set(key, s); sidToKey.set(sid, key);
+    dropStandIn(sid);
     broadcast({ k: 'sess', s: pub(s) });
   }
   const now = Date.now();
@@ -2097,6 +2147,20 @@ async function openFolder(dir) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  // MyDesk links itself (server/mydesk.mjs): from this computer only, like the hooks.
+  if (url.pathname === '/api/mydesk' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!isLoopback(req)) { res.writeHead(403).end(); return; }
+    if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(mydesk.status())); return; }
+    const chunks = [];
+    req.on('data', (c) => { if (chunks.length < 16) chunks.push(c); });
+    req.on('end', () => {
+      let body = {};
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
+      const ok = mydesk.link(body.url);
+      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok, ...mydesk.status() }));
+    });
+    return;
+  }
   if (req.method === 'POST' && url.pathname === '/event') {
     if (!isLoopback(req)) { res.writeHead(403).end(); return; }
     const chunks = []; let size = 0;

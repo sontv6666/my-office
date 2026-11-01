@@ -21,7 +21,7 @@ export function setConn(on) { const c = $('conn'); c.dataset.state = on ? 'on' :
    the nearest free area. Areas are remembered on this device, so a project comes back to the same desks tomorrow; an
    area someone else remembers is the last one handed to a newcomer. Only when every area is taken do projects share. */
 const deskOf = new Map(), rowTeam = new Map();
-const projOf = (s) => s?.git?.repo || String(s?.dir || '').split('/').filter(Boolean).pop() || tr('activity.live.otherProject');
+const projOf = (s) => s?.git?.repo || String(s?.dir || '').split(/[\\/]/).filter(Boolean).pop() || tr('activity.live.otherProject');
 // partners sit face to face across a pod's screen (back-left, then front-right…): one faces the camera, the other's
 // screens do; a room fills its first pod before the second
 const SEAT_ORDER = [0, 3, 1, 2, 4, 7, 5, 6];
