@@ -31,6 +31,7 @@ import '@/styles/tips.css';
 import '@/styles/settings.css';
 import '@/styles/responsive.css';
 import '@/styles/phone.css';
+import '@/styles/embed.css';
 
 /* The page's title, description and share card (the image and icons are files in app/: opengraph-image.jpg,
    twitter-image.jpg, icon.svg, favicon.ico, apple-icon.png). The online demo knows its address (OFFICE_SITE_URL, set by
@@ -57,8 +58,14 @@ export const viewport: Viewport = { width: 'device-width', initialScale: 1, view
 export default async function RootLayout({ children }: { children: ReactNode }) {
   return (
     // data-os: the machine's platform, for the words "Mac" / "PC" / "computer" (the online demo is a pretend Mac)
-    <html lang={await getLang()} data-os={process.env.OFFICE_STATIC === '1' ? 'darwin' : process.platform}>
+    // (suppressHydrationWarning: the embed script below may add a class to <html> before React hydrates)
+    <html lang={await getLang()} data-os={process.env.OFFICE_STATIC === '1' ? 'darwin' : process.platform} suppressHydrationWarning>
       <body>
+        {/* Shown as MyDesk's 3D view (?embed=mydesk): only the stage; MyDesk has the sessions and the activity itself.
+            Before paint, so the side panels never flash. */}
+        <Script id="embed-mode" strategy="beforeInteractive">
+          {"if (new URLSearchParams(location.search).get('embed') === 'mydesk') document.documentElement.classList.add('embed-mydesk');"}
+        </Script>
         {children}
         {/* QR codes for "open on your phone" (qrcode.js, MIT), kept local so the office works offline */}
         <Script src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/assets/vendor/qrcode.min.js`} strategy="afterInteractive" />

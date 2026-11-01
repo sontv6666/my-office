@@ -1,0 +1,6 @@
+/* ?embed=mydesk — the office as MyDesk's 3D view (app/layout.tsx sets html.embed-mydesk): the stage alone, edge to edge.
+   MyDesk shows the sessions, the activity and the title around it; the stage keeps its own camera bar and drawers. */
+html.embed-mydesk #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "stage"; }
+html.embed-mydesk .topbar,
+html.embed-mydesk .side-left,
+html.embed-mydesk .side-right { display: none !important; }
