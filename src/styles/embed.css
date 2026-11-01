@@ -91,3 +91,19 @@ html.embed-mydesk[data-mydesk-theme="light"] .stage-wrap {
   color: var(--ink);
   color-scheme: dark;
 }
+
+/* &pip=1 — MyDesk's picture-in-picture window: the office floor and its people only, edge to edge, no bars, no tour.
+   (An unfocused window already draws at 8 fps: core/loop.js frameGap.) */
+html.embed-pip #app { padding: 0; gap: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "stage"; }
+html.embed-pip .topbar,
+html.embed-pip .side-left,
+html.embed-pip .side-right,
+html.embed-pip .toolbar,
+html.embed-pip .tour-wrap,
+html.embed-pip .chips,
+html.embed-pip .ph-tabs,
+html.embed-pip .perm-stack { display: none !important; }   /* (a small window is "phone-like": its chip row and tab bar; prompts are MyDesk's) */
+html.embed-pip .stage-wrap { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0 !important; }
+html.embed-pip #stage { bottom: 0 !important; }
+html.embed-pip #app { height: 100% !important; }   /* (phone-like: room was kept for the tab bar) */
+/* (the script in app/layout.tsx turns the camera to the desks once the office is up: the agents, not the director) */

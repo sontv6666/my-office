@@ -47,8 +47,8 @@ let monitorM;
 let pedM;
 /* a person's things while they work: the coat over the chair back (it reclines with the chair) and the backpack on the
    floor beside it. They come in wearing them and take them home; one mesh each, shown only for an occupied desk. */
-export const COATS = ['#2F3B52', '#6B4F3A', '#46553F', '#7D2E3A', '#C2A97E', '#26292E', '#4F6D8F', '#8A8F98'];
-export const BAGS = ['#2B2F36', '#3F7CC4', '#E8742A', '#5E7A3A', '#8C4FA8', '#A0A8B2', '#C8553D'];
+import { COATS, BAGS } from '../../shared/look.js';
+export { COATS, BAGS };
 // pieces -> one geometry with vertex colours: a number up to 1 is a grey shade (the material colour tints the whole),
 // anything else a colour of its own
 export function shaded(parts) {

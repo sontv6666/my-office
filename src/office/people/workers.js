@@ -10,7 +10,8 @@ import { scene } from '../scene/renderer.js';
 import { canvasTex } from '../scene/blocks.js';
 import { inside } from '../world/layout.js';
 import { lift, liftArrive } from '../world/entrance.js';
-import { BAGS, COATS, chairs, deskKit } from '../world/desks.js';
+import { chairs, deskKit } from '../world/desks.js';
+import { PALETTE, colorOf, hash, lookOf } from '../../shared/look.js';   // (also the server's: MyDesk draws the same people)
 import { CLAUDE_MARK } from '../world/pro/pieces.js';
 import { DESK_SPOTS, DOOR_IN, DOOR_OUT, NODES, STATIONS, allocate, faceTo, nearestNode, route } from './navigation.js';
 import { COFFEE_Q, hideMeal, joinCoffee, leaveCoffee, showMeal } from './breaks.js';
@@ -19,10 +20,8 @@ import { sfx } from '../audio/sfx.js';
 import { t as tr } from '../../i18n/index.js';
 
 /* ---------- workers ---------- */
-export const PALETTE = ['#6A8042', '#E8742A', '#3F7CC4', '#8C4FA8', '#D64550', '#2A9D8F', '#C9A227', '#5B6CD8', '#B5651D', '#C2577A', '#3E8E7E', '#7A6FD0'];
-const HAIRS = ['#3B2618', '#1E1E24', '#9A4A24', '#E2B04A', '#5A3825', '#2B2B2B', '#C2703D', '#7A4E2D'];
-const STYLES = ['bob', 'spiky', 'ponytail', 'bun', 'plain', 'curly'];
-const ACCS = ['headphones', 'glasses', 'beanie', 'cap', null, null, null];
+export { PALETTE, colorOf, hash };
+import { HAIRS, STYLES } from '../../shared/look.js';
 // set by outings.js (with the city outside): home(w, gone) takes someone leaving out by the street (true if it does),
 // arrive(w) brings someone back the same way
 export const streetHooks = {};
@@ -32,8 +31,6 @@ export const clockHooks = {};
 // set by people/comnha.js: home(w, d, minute) says whether w brought lunch from home today ({ due, join }), else null
 export const lunchHooks = {};
 const viaClock = (kind, w, then) => (clockHooks[kind] ? clockHooks[kind](w, then) : then());
-export function hash(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-export const colorOf = (s) => (s.desk >= 0 ? PALETTE[s.desk] : PALETTE[hash(s.name) % PALETTE.length]);
 // What to call a session on screen: the chat's title (your rename, else Claude's), else its short name.
 // The short name stays the identity: looks, colours and the timeline are keyed by it.
 export const dn = (s) => (s ? s.title || s.name : '');
@@ -66,7 +63,6 @@ export function updateZs(dt) {
     if (z.life <= 0) { scene.remove(z.s); z.s.material.dispose(); zs.splice(i, 1); }
   }
 }
-function lookOf(s) { const h = hash(s.name); return { shirt: colorOf(s), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: ACCS[(h >>> 7) % ACCS.length], coat: COATS[(h >>> 11) % COATS.length], bag: BAGS[(h >>> 15) % BAGS.length] }; }
 export const workers = new Map();   // session id -> Worker
 export const npcs = [];             // people who aren't sessions: the director on the company floor
 export const subs = new Map();      // subagent id -> Worker

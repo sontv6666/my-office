@@ -38,6 +38,7 @@ import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
 import { createMyDesk } from './mydesk.mjs';
+import { lookOf } from '../src/shared/look.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
 
@@ -894,6 +895,34 @@ async function recallTask(s) {
   if (s.status === 'rest') s.doneAt = items.at(-1)?.ts || 0;
   broadcast({ k: 'sess', s: pub(s) });
 }
+/* ---------- the people's looks, for MyDesk's desk window ----------
+   The page picks each session's desk (its shirt) and the look style (toy / pixar), so it reports them; they are kept by
+   Claude session id (session ids here change on a restart) in data/looks.json. */
+const LOOKS_FILE = path.join(DATA_DIR, 'looks.json');
+let pageLooks = {};   // agent id (Claude session id, or a stand-in's MyDesk id) -> { desk, look }
+try { pageLooks = JSON.parse(fs.readFileSync(LOOKS_FILE, 'utf8')) || {}; } catch { /* none yet */ }
+let looksDirty = false;
+setInterval(() => { if (!looksDirty) return; looksDirty = false; fsp.writeFile(LOOKS_FILE, JSON.stringify(pageLooks)).catch(() => {}); }, 5000).unref();
+const agentIdOf = (s) => s.sid || (s.external ? s.key.slice(1) : null);
+function noteLook(it) {
+  if (!it || typeof it.id !== 'string') return;
+  const s = [...sessions.values()].find((x) => x.id === it.id), aid = s && agentIdOf(s);
+  if (!aid) return;
+  const v = { desk: Number.isInteger(it.desk) ? it.desk : -1, look: it.look === 'toy' ? 'toy' : 'pixar' };
+  if (pageLooks[aid]?.desk === v.desk && pageLooks[aid]?.look === v.look) return;
+  pageLooks[aid] = v; looksDirty = true;
+}
+/** [{ agentId, name, look: makeChibi's cfg }] for the sessions in the office now. */
+function looksFor() {
+  const out = [];
+  for (const s of sessions.values()) {
+    const aid = agentIdOf(s); if (!aid) continue;
+    const r = pageLooks[aid] || {};
+    out.push({ agentId: aid, name: s.name, reported: !!pageLooks[aid], look: { name: s.name, ...lookOf({ name: s.name, desk: r.desk ?? -1 }), look: r.look || 'pixar' } });
+  }
+  return out;
+}
+
 /* ---------- MyDesk's cast (server/mydesk.mjs) ---------- */
 // A session's first hooks can come before MyDesk lists it: kept a minute, replayed when it does.
 const held = new Map();   // sessionId -> [[at, payload]]
@@ -2147,6 +2176,21 @@ async function openFolder(dir) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  // How each session's person looks, for MyDesk's desk window (the page reports desks and the look style: looksFor()).
+  if (url.pathname === '/api/mydesk/looks') {
+    if (!isLoopback(req)) { res.writeHead(403).end(); return; }
+    if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ looks: looksFor() })); return; }
+    if (req.method !== 'POST') { res.writeHead(405).end(); return; }
+    const chunks = [];
+    req.on('data', (c) => { if (chunks.length < 64) chunks.push(c); });
+    req.on('end', () => {
+      let body = {};
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
+      for (const it of Array.isArray(body.items) ? body.items.slice(0, 200) : []) noteLook(it);
+      res.writeHead(204).end();
+    });
+    return;
+  }
   // MyDesk links itself (server/mydesk.mjs): from this computer only, like the hooks.
   if (url.pathname === '/api/mydesk' && (req.method === 'GET' || req.method === 'POST')) {
     if (!isLoopback(req)) { res.writeHead(403).end(); return; }

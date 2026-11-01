@@ -87,8 +87,24 @@ export function updateTeamTags() {
     tg.o.element.title = projs.length > 1 ? tr('activity.live.teamShared', { name, others: projs.slice(1).join(', ') }) : tr('activity.live.teamTitle', { name });
   });
 }
+// The desk this page gave each session (it picks the shirt) and the office's look style, sent to the server so MyDesk's
+// desk window can draw the same people (server/mydesk.mjs). Batched; only what changed.
+const looksSent = new Map(), looksDue = new Map();
+let looksTimer = 0;
+function reportLook(s) {
+  const v = { desk: s.desk, look: state.LOOK || 'pixar' }, key = `${v.desk}|${v.look}`;
+  if (looksSent.get(s.id) === key) return;
+  looksSent.set(s.id, key); looksDue.set(s.id, v);
+  if (looksTimer || new URLSearchParams(location.search).has("demo")) return;   // (the online demo has no server)
+  looksTimer = setTimeout(() => {
+    looksTimer = 0;
+    const items = [...looksDue.entries()].map(([id, x]) => ({ id, ...x })); looksDue.clear();
+    fetch('/api/mydesk/looks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }).catch(() => {});
+  }, 800);
+}
 export function upsertSession(s, walkIn = true) {
   s.desk = proDesk(s);   // (every layout: the project's area)
+  reportLook(s);
   const had = sessions.has(s.id);
   sessions.set(s.id, s);
   let w = workers.get(s.id);
