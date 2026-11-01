@@ -59,31 +59,35 @@ html.embed-mydesk .topbar { border-bottom: 1px solid var(--line); }
 html.embed-mydesk[data-mydesk-theme="light"] .ri[data-done="1"] .ri-doing { color: var(--blue); }
 html.embed-mydesk[data-mydesk-theme="light"] .lite-card[data-status="wait"] { background: var(--amber-soft); }
 
-/* The floating camera bar: a light glass bar on the light theme (its own colours are for a dark room), and the main
-   button's glow in MyDesk's blue instead of the office's coral. */
+/* The main camera button's glow in MyDesk's blue instead of the office's coral. */
 html.embed-mydesk .tb-fp { box-shadow: 0 4px 14px rgba(33, 139, 234, .28), inset 0 1px 0 rgba(255, 255, 255, .28); }
-html.embed-mydesk[data-mydesk-theme="light"] .toolbar { background: rgba(255, 255, 255, .86); box-shadow: 0 12px 32px rgba(15, 23, 42, .16), inset 0 1px 0 rgba(255, 255, 255, .6); }
-html.embed-mydesk[data-mydesk-theme="light"] .tb-seg,
-html.embed-mydesk[data-mydesk-theme="light"] .tb-zoom,
-html.embed-mydesk[data-mydesk-theme="light"] .tb-tools { background: rgba(15, 23, 42, .045); }
-html.embed-mydesk[data-mydesk-theme="light"] .tb-zoom button:hover,
-html.embed-mydesk[data-mydesk-theme="light"] .tb-full:hover { background: rgba(15, 23, 42, .07); }
-html.embed-mydesk[data-mydesk-theme="light"] .seg-btn:hover,
-html.embed-mydesk[data-mydesk-theme="light"] .seg-btn:focus-visible { background: rgba(15, 23, 42, .06); }
-html.embed-mydesk[data-mydesk-theme="light"] .seg-btn[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .12), inset 0 0 0 1px rgba(15, 23, 42, .08); }
 
-/* &pip=1 — MyDesk's picture-in-picture window: the office floor and its people only, edge to edge, no bars, no tour.
-   (An unfocused window already draws at 8 fps: core/loop.js frameGap.) */
-html.embed-pip #app { padding: 0; gap: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "stage"; }
-html.embed-pip .topbar,
-html.embed-pip .side-left,
-html.embed-pip .side-right,
-html.embed-pip .toolbar,
-html.embed-pip .tour-wrap,
-html.embed-pip .chips,
-html.embed-pip .ph-tabs,
-html.embed-pip .perm-stack { display: none !important; }   /* (a small window is "phone-like": its chip row and tab bar; prompts are MyDesk's) */
-html.embed-pip .stage-wrap { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0 !important; }
-html.embed-pip #stage { bottom: 0 !important; }
-html.embed-pip #app { height: 100% !important; }   /* (phone-like: room was kept for the tab bar) */
-/* (the script in app/layout.tsx turns the camera to the desks once the office is up: the agents, not the director) */
+/* Pop-overs and the chat on the light theme: their backgrounds are fixed dark colours in the office's own files. */
+html.embed-mydesk .pop { box-shadow: var(--md-shadow); }
+html.embed-mydesk[data-mydesk-theme="light"] .pop { background: #fff; box-shadow: 0 22px 50px rgba(15, 23, 42, .18); }
+html.embed-mydesk[data-mydesk-theme="light"] .msg--user { background: #e5f1ff; border-color: rgba(0, 110, 220, .2); }
+html.embed-mydesk[data-mydesk-theme="light"] .md-code,
+html.embed-mydesk[data-mydesk-theme="light"] .pa-code,
+html.embed-mydesk[data-mydesk-theme="light"] .acct-rename input { background: #f3f5f8; }
+html.embed-mydesk[data-mydesk-theme="light"] .md code,
+html.embed-mydesk[data-mydesk-theme="light"] .md th { background: rgba(15, 23, 42, .05); }
+html.embed-mydesk[data-mydesk-theme="light"] .chat-jump:hover { background: #e3e8ef; }
+html.embed-mydesk[data-mydesk-theme="light"] .msg-summary,
+html.embed-mydesk[data-mydesk-theme="light"] .msg-summary > summary:hover { background: rgba(15, 23, 42, .03); }
+html.embed-mydesk[data-mydesk-theme="light"] .q-bars i { background: rgba(15, 23, 42, .14); }
+
+/* Over the 3D scene, a dark HUD on every theme: the office draws its in-scene cards, chips, prompts, tooltips and
+   camera bar on fixed dark backgrounds, so the light theme's dark ink would vanish there. The stage gets MyDesk's
+   dark palette back; the panels around it stay light. */
+html.embed-mydesk[data-mydesk-theme="light"] .stage-wrap {
+  --bg: #0d1016; --bar: #141922; --side: #141922; --card: #1a2029; --card-2: #212834; --card-3: #2a3240;
+  --line: rgba(255, 255, 255, .08); --line-2: rgba(255, 255, 255, .15);
+  --ink: #f2f4f8; --muted: #a3abb8; --faint: #6f7886;
+  --green: #30d158; --green-ink: #8be9a8; --green-soft: rgba(48, 209, 88, .13);
+  --amber: #ff9f0a; --amber-soft: rgba(255, 159, 10, .13);
+  --accent: #218bea; --accent-hi: #4da3f3; --accent-soft: rgba(33, 139, 234, .18); --accent-line: rgba(33, 139, 234, .6); --on-accent: #f7fbff;
+  --red: #ff6b6b; --red-soft: rgba(255, 107, 107, .13);
+  --blue: #4aa8ff;
+  color: var(--ink);
+  color-scheme: dark;
+}
