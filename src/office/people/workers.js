@@ -521,7 +521,8 @@ export function setup() {
       this.blinkAt -= dt; if (this.blinkAt < 0) this.blinkAt = rand(2.5, 5);
       const napping = this.anim === 'sleep' && !walking;
       if (napping && (this.zT -= dt) < 0) { this.zT = 1.4; puffZ(this); }
-      const pose = chibiPose(this.P, walking ? 'walk' : this.anim, t + this.seed,
+      this.shown = walking ? 'walk' : this.anim;   // (what the person is seen doing: reported to MyDesk, net/live.js)
+      const pose = chibiPose(this.P, this.shown, t + this.seed,
         { sit, scale: this.scale, look: idleish ? this.lookY : 0, wave: !walking && this.waveUntil > t, blink: this.blinkAt < 0.12, carry: this.carry, doze: this.doze });
       const y = applyChibiPose(this.P, pose, dt) * this.scale;
       this.root.position.set(this.pos.x + this.stompShift, y + this.gy(), this.pos.y);

@@ -923,6 +923,23 @@ function looksFor() {
   return out;
 }
 
+/* What each person is doing on the page now (net/live.js reportActivity): agent id -> the pose. One page at a time
+   (the PiP and a tab each run their own office): another page's reports count once the current one has been quiet 4 s. */
+let activity = { page: null, at: 0, items: [] };
+function noteActivity(body) {
+  const now = Date.now();
+  if (typeof body?.page !== 'string' || !Array.isArray(body.items)) return;
+  if (activity.page && activity.page !== body.page && now - activity.at < 4000) return;
+  const items = [], byId = new Map([...sessions.values()].map((x) => [x.id, x]));   // (the page knows sessions by .id)
+  for (const it of body.items.slice(0, 200)) {
+    const s = it && typeof it.id === 'string' && byId.get(it.id), aid = s && agentIdOf(s);
+    if (aid && typeof it.anim === 'string' && /^[a-z]{1,16}$/.test(it.anim)) items.push({ agentId: aid, anim: it.anim });
+  }
+  activity = { page: body.page, at: now, items };
+}
+/** { fresh, items: [{ agentId, anim }] }: fresh while a page has reported in the last 5 s. */
+const activityNow = () => ({ fresh: Date.now() - activity.at < 5000, items: activity.items });
+
 /* ---------- MyDesk's cast (server/mydesk.mjs) ---------- */
 // A session's first hooks can come before MyDesk lists it: kept a minute, replayed when it does.
 const held = new Map();   // sessionId -> [[at, payload]]
@@ -2187,6 +2204,19 @@ const server = http.createServer((req, res) => {
       let body = {};
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
       for (const it of Array.isArray(body.items) ? body.items.slice(0, 200) : []) noteLook(it);
+      res.writeHead(204).end();
+    });
+    return;
+  }
+  // What each person is doing now, for MyDesk's desk window (activityNow()).
+  if (url.pathname === '/api/mydesk/activity') {
+    if (!isLoopback(req)) { res.writeHead(403).end(); return; }
+    if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(activityNow())); return; }
+    if (req.method !== 'POST') { res.writeHead(405).end(); return; }
+    const chunks = [];
+    req.on('data', (c) => { if (chunks.length < 64) chunks.push(c); });
+    req.on('end', () => {
+      try { noteActivity(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not JSON */ }
       res.writeHead(204).end();
     });
     return;

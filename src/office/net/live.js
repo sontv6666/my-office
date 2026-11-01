@@ -102,6 +102,20 @@ function reportLook(s) {
     fetch('/api/mydesk/looks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }).catch(() => {});
   }, 800);
 }
+// What each person is doing right now (asleep, at the coffee machine, typing…), so MyDesk's desk window can show the
+// same: every second while this page is seen, the whole list when it changed or every 3 s (the server keeps one page's).
+const pageId = Math.random().toString(36).slice(2);
+let activitySent = '', activityAt = 0;
+function reportActivity() {
+  if (document.hidden) return;   // (a hidden page does not animate: MyDesk goes back to its own states)
+  const items = [];
+  for (const [id, w] of workers) if (w.shown) items.push({ id, anim: w.shown });
+  const key = JSON.stringify(items), now = Date.now();
+  if (key === activitySent && now - activityAt < 3000) return;
+  activitySent = key; activityAt = now;
+  fetch('/api/mydesk/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: pageId, items }) }).catch(() => {});
+}
+if (typeof window !== 'undefined' && !new URLSearchParams(location.search).has('demo')) setInterval(reportActivity, 1000);
 export function upsertSession(s, walkIn = true) {
   s.desk = proDesk(s);   // (every layout: the project's area)
   reportLook(s);
