@@ -61,10 +61,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     // (suppressHydrationWarning: the embed script below may add a class to <html> before React hydrates)
     <html lang={await getLang()} data-os={process.env.OFFICE_STATIC === '1' ? 'darwin' : process.platform} suppressHydrationWarning>
       <body>
-        {/* Shown as MyDesk's 3D view (?embed=mydesk): only the stage; MyDesk has the sessions and the activity itself.
-            Before paint, so the side panels never flash. */}
+        {/* Shown as MyDesk's 3D view (?embed=mydesk&theme=…): the office in MyDesk's look (src/styles/embed.css).
+            Before paint, so the office's own colours never flash. */}
         <Script id="embed-mode" strategy="beforeInteractive">
-          {"if (new URLSearchParams(location.search).get('embed') === 'mydesk') document.documentElement.classList.add('embed-mydesk');"}
+          {"(function () { var q = new URLSearchParams(location.search); if (q.get('embed') !== 'mydesk') return; var h = document.documentElement; h.classList.add('embed-mydesk'); var t = q.get('theme'); h.setAttribute('data-mydesk-theme', t === 'light' || t === 'contrast' ? t : 'dark'); if (q.get('pip') === '1') { h.classList.add('embed-pip'); var n = 0, t2 = setInterval(function () { var b = document.querySelector('.seg-btn[data-view=desks]'); if (b && document.querySelector('#stage canvas')) { clearInterval(t2); setTimeout(function () { b.click(); }, 1500); setTimeout(function () { b.click(); }, 4500); } else if (++n > 40) clearInterval(t2); }, 250); } })();"}
         </Script>
         {children}
         {/* QR codes for "open on your phone" (qrcode.js, MIT), kept local so the office works offline */}

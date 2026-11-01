@@ -1,6 +1,89 @@
-/* ?embed=mydesk — the office as MyDesk's 3D view (app/layout.tsx sets html.embed-mydesk): the stage alone, edge to edge.
-   MyDesk shows the sessions, the activity and the title around it; the stage keeps its own camera bar and drawers. */
-html.embed-mydesk #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "stage"; }
+/* ?embed=mydesk — the office as MyDesk's 3D view (app/layout.tsx sets html.embed-mydesk, and data-mydesk-theme from
+   &theme=light|dark|contrast). The whole office stays — top bar, sessions, activity, drawers — dressed in MyDesk's
+   design tokens (frontend/src/ui/tokens.css there): its type, its blue accent, its surfaces, rounded panels with air
+   between them, light or dark after MyDesk's theme. Only colours, type and panel shapes change here; layout and
+   behaviour are the office's own. */
+
+/* Dark (MyDesk dark): the office's palette, re-tinted to MyDesk's. */
+html.embed-mydesk {
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: "Cascadia Code", "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --bg: #0d1016; --bar: #141922; --side: #141922; --card: #1a2029; --card-2: #212834; --card-3: #2a3240;
+  --line: rgba(255, 255, 255, .08); --line-2: rgba(255, 255, 255, .15);
+  --ink: #f2f4f8; --muted: #a3abb8; --faint: #6f7886;
+  --green: #30d158; --green-ink: #8be9a8; --green-soft: rgba(48, 209, 88, .13);
+  --amber: #ff9f0a; --amber-soft: rgba(255, 159, 10, .13);
+  --accent: #218bea; --accent-hi: #4da3f3; --accent-soft: rgba(33, 139, 234, .18); --accent-line: rgba(33, 139, 234, .6); --on-accent: #f7fbff;
+  --red: #ff6b6b; --red-soft: rgba(255, 107, 107, .13);
+  --blue: #4aa8ff;
+  --md-radius: 18px;
+  --md-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+}
+
+/* Light (MyDesk's default): white panels on MyDesk's pale blue-grey. */
+html.embed-mydesk[data-mydesk-theme="light"] {
+  --bg: #eef2f7; --bar: #ffffff; --side: #ffffff; --card: #f5f7fa; --card-2: #edf1f6; --card-3: #e3e8ef;
+  --line: rgba(15, 23, 42, .09); --line-2: rgba(15, 23, 42, .17);
+  --ink: #1d1f23; --muted: #5b6370; --faint: #7a818c;
+  --green: #1fa855; --green-ink: #137a3c; --green-soft: rgba(31, 168, 85, .12);
+  --amber: #e08600; --amber-soft: rgba(224, 134, 0, .12);
+  --accent: #006edc; --accent-hi: #005bb8; --accent-soft: rgba(0, 110, 220, .1); --accent-line: rgba(0, 110, 220, .5); --on-accent: #f7fbff;
+  --red: #d93025; --red-soft: rgba(217, 48, 37, .1);
+  --blue: #0066cc;
+  --md-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .06);
+  color-scheme: light;
+}
+
+/* High contrast: black panels, white lines. */
+html.embed-mydesk[data-mydesk-theme="contrast"] {
+  --bg: #000; --bar: #000; --side: #000; --card: #000; --card-2: #111; --card-3: #1a1a1a;
+  --line: #fff; --line-2: #fff; --ink: #fff; --muted: #e6e6e6; --faint: #c8c8c8;
+  --accent: #4cc2ff; --accent-hi: #8ad8ff; --accent-soft: rgba(76, 194, 255, .25); --accent-line: #4cc2ff; --on-accent: #000;
+  --green: #3dff6e; --amber: #ffd23f; --red: #ff6b6b; --blue: #8ad8ff;
+}
+
+/* Panels with air between them, rounded like MyDesk's cards (the 3D stage included). */
+html.embed-mydesk body { background: var(--bg); }
+html.embed-mydesk #app { gap: 10px; padding: 10px; }
 html.embed-mydesk .topbar,
 html.embed-mydesk .side-left,
-html.embed-mydesk .side-right { display: none !important; }
+html.embed-mydesk .side-right,
+html.embed-mydesk .stage-wrap {
+  border: 1px solid var(--line); border-radius: var(--md-radius); box-shadow: var(--md-shadow); overflow: hidden;
+}
+html.embed-mydesk .side-left { border-right: 1px solid var(--line); }
+html.embed-mydesk .side-right { border-left: 1px solid var(--line); }
+html.embed-mydesk .topbar { border-bottom: 1px solid var(--line); }
+
+/* Light: the office's dark-only touches (white text on tinted rows, glows meant for a dark room). */
+html.embed-mydesk[data-mydesk-theme="light"] .ri[data-done="1"] .ri-doing { color: var(--blue); }
+html.embed-mydesk[data-mydesk-theme="light"] .lite-card[data-status="wait"] { background: var(--amber-soft); }
+
+/* The floating camera bar: a light glass bar on the light theme (its own colours are for a dark room), and the main
+   button's glow in MyDesk's blue instead of the office's coral. */
+html.embed-mydesk .tb-fp { box-shadow: 0 4px 14px rgba(33, 139, 234, .28), inset 0 1px 0 rgba(255, 255, 255, .28); }
+html.embed-mydesk[data-mydesk-theme="light"] .toolbar { background: rgba(255, 255, 255, .86); box-shadow: 0 12px 32px rgba(15, 23, 42, .16), inset 0 1px 0 rgba(255, 255, 255, .6); }
+html.embed-mydesk[data-mydesk-theme="light"] .tb-seg,
+html.embed-mydesk[data-mydesk-theme="light"] .tb-zoom,
+html.embed-mydesk[data-mydesk-theme="light"] .tb-tools { background: rgba(15, 23, 42, .045); }
+html.embed-mydesk[data-mydesk-theme="light"] .tb-zoom button:hover,
+html.embed-mydesk[data-mydesk-theme="light"] .tb-full:hover { background: rgba(15, 23, 42, .07); }
+html.embed-mydesk[data-mydesk-theme="light"] .seg-btn:hover,
+html.embed-mydesk[data-mydesk-theme="light"] .seg-btn:focus-visible { background: rgba(15, 23, 42, .06); }
+html.embed-mydesk[data-mydesk-theme="light"] .seg-btn[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .12), inset 0 0 0 1px rgba(15, 23, 42, .08); }
+
+/* &pip=1 — MyDesk's picture-in-picture window: the office floor and its people only, edge to edge, no bars, no tour.
+   (An unfocused window already draws at 8 fps: core/loop.js frameGap.) */
+html.embed-pip #app { padding: 0; gap: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "stage"; }
+html.embed-pip .topbar,
+html.embed-pip .side-left,
+html.embed-pip .side-right,
+html.embed-pip .toolbar,
+html.embed-pip .tour-wrap,
+html.embed-pip .chips,
+html.embed-pip .ph-tabs,
+html.embed-pip .perm-stack { display: none !important; }   /* (a small window is "phone-like": its chip row and tab bar; prompts are MyDesk's) */
+html.embed-pip .stage-wrap { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0 !important; }
+html.embed-pip #stage { bottom: 0 !important; }
+html.embed-pip #app { height: 100% !important; }   /* (phone-like: room was kept for the tab bar) */
+/* (the script in app/layout.tsx turns the camera to the desks once the office is up: the agents, not the director) */
