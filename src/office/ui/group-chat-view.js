@@ -830,13 +830,17 @@ function build() {
   // a computer's toolbar over the input: stickers, a photo of the office, a file, a card, a poll, @, more
   const photoBtn = (cls) => { const b = ib('image', tr('chat.sendPhoto'), () => (target ? pickPhotos() : chatSendPhoto()), `${cls} zc-photo-btn`); b.hidden = !state.isLocal; return b; };   // (to the group: a photo of the office as it is now, taken on the Mac; to Claude: one of yours)
   const atBtn = () => { moreEl.hidden = true; input.focus(); input.setRangeText(input.value && !/\s$/.test(input.value) ? ' @' : '@', input.selectionStart, input.selectionEnd, 'end'); mentions(); };
+  // 📎 photos for Claude (to the group: first pick whom it goes to), 🪪 whom you write to, the big editor for a long brief
+  const clipBtn = () => (target ? pickPhotos() : openPick());
+  const bigBtn = () => { const on = root.classList.toggle('is-big-in'); fmt.classList.toggle('is-on', on); fmt.setAttribute('aria-pressed', String(on)); input.style.height = ''; input.focus(); };
+  const fmt = ib('format', tr('chat.bigInput'), bigBtn); fmt.setAttribute('aria-pressed', 'false');
   const toolbar = el('div', 'zc-toolbar zc-pc');
-  toolbar.append(ib('smile', tr('chat.stickerTab'), () => openStickers('sticker')), photoBtn(''), ib('clip', ''), ib('card', ''), ib('chart', tr('chat.newPoll'), openMore), ib('at', tr('chat.mention'), atBtn),
-    ib('clipboard', tr('chat.task.title'), () => openTaskSheet(root), 'zc-task-btn'), ib('format', ''), ib('more', tr('chat.more'), openMore));
+  toolbar.append(ib('smile', tr('chat.stickerTab'), () => openStickers('sticker')), photoBtn(''), ib('clip', tr('chat.attachPhotos'), clipBtn), ib('card', tr('chat.to.pick'), openPick), ib('chart', tr('chat.newPoll'), openMore), ib('at', tr('chat.mention'), atBtn),
+    ib('clipboard', tr('chat.task.title'), () => openTaskSheet(root), 'zc-task-btn'), fmt, ib('more', tr('chat.more'), openMore));
   bar = el('form', 'zc-bar');
   input = el('textarea', 'zc-in'); input.rows = 1; input.maxLength = 600;
   input.placeholder = tr(matchMedia('(max-width: 640px)').matches ? 'chat.placeholder' : 'chat.placeholderPc', { group: tr('chat.group') });
-  input.addEventListener('input', () => { syncBar(); mentions(); input.style.height = ''; input.style.height = `${Math.min(110, input.scrollHeight)}px`; coachLater(); });
+  input.addEventListener('input', () => { syncBar(); mentions(); input.style.height = ''; input.style.height = `${Math.min(root.classList.contains('is-big-in') ? 320 : 110, input.scrollHeight)}px`; coachLater(); });
   input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } if (e.key === 'Escape') { if (steerTo) setSteer(null); else if (replyTo) setReply(null); else toggle(false); } });
   // the phone's 🎤: speak into the input (the browser's speech recognition, in the office's language)
   let stopMic = null;

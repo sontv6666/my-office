@@ -73,6 +73,8 @@ export default {
   pollSee: 'See votes',
   more: 'More',
   sendPhoto: 'Send a photo of the office now',
+  attachPhotos: 'Attach photos for Claude (pick a conversation first)',
+  bigInput: 'Bigger editor, for a long message',
   newPoll: 'New poll',
   mention: 'Mention (@)',
   pollAsk: 'Poll question',

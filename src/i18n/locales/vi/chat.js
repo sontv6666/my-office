@@ -72,6 +72,8 @@ export default {
   pollSee: 'Xem lựa chọn',
   more: 'Thêm',
   sendPhoto: 'Gửi ảnh văn phòng lúc này',
+  attachPhotos: 'Đính kèm ảnh cho Claude (chọn cuộc trò chuyện trước)',
+  bigInput: 'Khung soạn lớn, cho tin dài',
   newPoll: 'Tạo bình chọn',
   mention: 'Nhắc tên (@)',
   pollAsk: 'Câu hỏi bình chọn',
