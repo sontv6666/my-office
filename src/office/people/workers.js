@@ -11,7 +11,7 @@ import { canvasTex } from '../scene/blocks.js';
 import { inside } from '../world/layout.js';
 import { lift, liftArrive } from '../world/entrance.js';
 import { chairs, deskKit } from '../world/desks.js';
-import { PALETTE, colorOf, hash, lookOf } from '../../shared/look.js';   // (also the server's: MyDesk draws the same people)
+import { PALETTE, colorOf, hash, lookOf, wearOn } from '../../shared/look.js';   // (also the server's: MyDesk draws the same people)
 import { CLAUDE_MARK } from '../world/pro/pieces.js';
 import { DESK_SPOTS, DOOR_IN, DOOR_OUT, NODES, STATIONS, allocate, faceTo, nearestNode, route } from './navigation.js';
 import { COFFEE_Q, hideMeal, joinCoffee, leaveCoffee, showMeal } from './breaks.js';
@@ -69,7 +69,8 @@ export const subs = new Map();      // subagent id -> Worker
 export const sessions = new Map();  // session id -> latest session object from the server
 export let Worker;
 export function addWorker(s, walkIn) {
-  const w = new Worker({ name: s.name, ...lookOf(s) }, { id: s.id });
+  const w = new Worker({ name: s.name, ...wearOn(lookOf(s), s.wear) }, { id: s.id });
+  w.wearKey = JSON.stringify(s.wear || null);   // (its own clothes: net/live.js redraws it when they change)
   if (s.desk >= 0) chairs[s.desk].color.set(colorOf(s));
   const home = w.homeSpot();
   if (walkIn) {

@@ -38,7 +38,7 @@ import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
 import { createMyDesk } from './mydesk.mjs';
-import { lookOf } from '../src/shared/look.js';
+import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
 
@@ -298,6 +298,7 @@ const pub = (s) => ({ id: s.id, pid: s.pid, agent: s.agent || undefined, name: s
   bg: s.bg ? [...s.bg.values()].slice(0, 6) : [],
   dayFirst: s.dayFirst || null,
   stuck: s.stuck || null,
+  wear: wearOf(s),
   cache: cacheOut(s),
   git: gitOf(s),
   usage: s.usage?.model ? { cost: Math.round(s.usage.cost * 100) / 100, ...liveCtx(s), model: s.usage.model, out: s.usage.out } : null });
@@ -912,13 +913,52 @@ function noteLook(it) {
   if (pageLooks[aid]?.desk === v.desk && pageLooks[aid]?.look === v.look) return;
   pageLooks[aid] = v; looksDirty = true;
 }
-/** [{ agentId, name, look: makeChibi's cfg }] for the sessions in the office now. */
+/* Each person's own clothes ("Đổi đồ" in the session drawer): agent id -> cleanWear(...), in data/wardrobe.json. A var
+   and a function declaration: pub() above uses them, and may run before this part of the file has. */
+var wardrobe;
+function wearOf(s) {
+  if (wardrobe === undefined) { try { wardrobe = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'wardrobe.json'), 'utf8')) || {}; } catch { wardrobe = {}; } }
+  const aid = s.sid || (s.external ? s.key.slice(1) : null);
+  return (aid && wardrobe[aid]) || null;
+}
+function setWear(s, w) {
+  wearOf(s);
+  const aid = agentIdOf(s); if (!aid) return false;
+  const v = cleanWear(w);
+  if (v) wardrobe[aid] = v; else delete wardrobe[aid];
+  fsp.writeFile(path.join(DATA_DIR, 'wardrobe.json'), JSON.stringify(wardrobe)).catch(() => {});
+  broadcast({ k: 'sess', s: pub(s) });
+  return true;
+}
+/* The page's areas (each one's desks in seat order), where each project sat before, and its look style: the last page
+   to report them. Lets the server dress a session the page has not drawn yet (predicted), so MyDesk's desk window shows
+   the office's person, not a stand-in, before the office is opened; the page's own report then wins. */
+const LAYOUT_FILE = path.join(DATA_DIR, 'looks-layout.json');
+let pageLayout = null;
+try { pageLayout = JSON.parse(fs.readFileSync(LAYOUT_FILE, 'utf8')) || null; } catch { /* none yet */ }
+function noteLayout(l) {
+  if (!l || !Array.isArray(l.units) || l.units.length > 64) return;
+  const units = l.units.map((u) => (Array.isArray(u) ? u.filter(Number.isInteger).slice(0, 16) : []));
+  const homes = {};
+  for (const [k, v] of Object.entries(l.homes && typeof l.homes === 'object' ? l.homes : {}).slice(0, 48)) if (Array.isArray(v)) homes[String(k).slice(0, 200)] = v.filter(Number.isInteger).slice(0, 3);
+  const next = { units, homes, look: l.look === 'toy' ? 'toy' : 'pixar' };
+  if (JSON.stringify(next) === JSON.stringify(pageLayout)) return;
+  pageLayout = next; fsp.writeFile(LAYOUT_FILE, JSON.stringify(next)).catch(() => {});
+}
+const projOfSession = (s) => gitOf(s)?.repo || String(s.cwd || '').split(/[\\/]/).filter(Boolean).pop() || '';
+/** [{ agentId, name, reported, predicted, look: makeChibi's cfg }] for the sessions in the office now. */
 function looksFor() {
-  const out = [];
+  const out = [], seated = [], guess = [];
   for (const s of sessions.values()) {
     const aid = agentIdOf(s); if (!aid) continue;
-    const r = pageLooks[aid] || {};
-    out.push({ agentId: aid, name: s.name, reported: !!pageLooks[aid], look: { name: s.name, ...lookOf({ name: s.name, desk: r.desk ?? -1 }), look: r.look || 'pixar' } });
+    const r = pageLooks[aid];
+    if (r) { seated.push({ desk: r.desk, proj: projOfSession(s) }); out.push({ agentId: aid, name: s.name, reported: true, look: { name: s.name, ...wearOn(lookOf({ name: s.name, desk: r.desk ?? -1 }), wearOf(s)), look: r.look || 'pixar' } }); }
+    else guess.push([aid, s]);
+  }
+  for (const [aid, s] of guess) {   // (one after another: two newcomers of a project get two desks)
+    const proj = projOfSession(s), desk = pageLayout ? guessDesk({ proj, units: pageLayout.units, homes: pageLayout.homes, seated }) : -1;
+    if (desk >= 0) seated.push({ desk, proj });
+    out.push({ agentId: aid, name: s.name, reported: false, predicted: true, look: { name: s.name, ...wearOn(lookOf({ name: s.name, desk }), wearOf(s)), look: pageLayout?.look || 'pixar' } });
   }
   return out;
 }
@@ -2204,6 +2244,7 @@ const server = http.createServer((req, res) => {
       let body = {};
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
       for (const it of Array.isArray(body.items) ? body.items.slice(0, 200) : []) noteLook(it);
+      noteLayout(body.layout);
       res.writeHead(204).end();
     });
     return;
@@ -2544,6 +2585,15 @@ const server = http.createServer((req, res) => {
       const result = await sysAction(body).catch((err) => ({ ok: false, message: String(err.message || err) }));
       fsp.appendFile(ACTION_LOG, `${new Date().toISOString()} ${req.socket.remoteAddress} ${JSON.stringify(body)} -> ${JSON.stringify(result)}\n`).catch(() => {});
       json(res, 200, result);
+    });
+    return;
+  }
+  // a person's own clothes, from the session drawer's "Đổi đồ": { id, wear } (wear null: back to the default look). On the Mac.
+  if (req.method === 'POST' && url.pathname === '/api/wardrobe') {
+    if (!isLoopback(req) || !sameOriginOf(req) || !String(req.headers['content-type'] || '').startsWith('application/json')) { json(res, 403, { ok: false }); return; }
+    readJson(req, 4000).then((b) => {
+      const s = [...sessions.values()].find((x) => x.id === String(b?.id || ''));
+      json(res, s && setWear(s, b.wear) ? 200 : 404, { ok: !!s, wear: s ? wearOf(s) : null });
     });
     return;
   }

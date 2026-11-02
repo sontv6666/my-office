@@ -13,6 +13,7 @@ import { unseenDone } from '../life/your-turn.js';
 import { DEMO, demoLog } from '../demo/demo.js';
 import { acctActions } from './session-account.js';
 import { drawDrawerCache } from './cache-words.js';
+import { wardrobePanel } from './wardrobe.js';
 import { t as tr, locale } from '../../i18n/index.js';
 
 /* ---------- session drawer ---------- */
@@ -63,7 +64,7 @@ export async function openWindowOf(s) {
   } catch { toast(tr('drawer.unreachable')); }
 }
 // what the buttons below depend on
-let drawnSig = '', qrFor = null;   // (qrFor: the session whose Remote Control QR code is shown)
+let drawnSig = '', qrFor = null, wearFor = null;   // (wearFor: the session whose "Đổi đồ" panel is open)   // (qrFor: the session whose Remote Control QR code is shown)
 const actionsSig = (s) => [s.id, s.status === 'rest', s.pid, s.moved?.to, s.acct, state.limits?.others?.length].join('|');
 function renderActions() {
   const s = sessions.get(state.selectedId); if (!s) return;
@@ -73,6 +74,12 @@ function renderActions() {
     b.title = tr('drawer.openWindowTitle'); b.addEventListener('click', () => openWindowOf(s)); box.append(b);
   }
   if (state.isLocal && s.pid && s.status === 'rest') box.append(closeSessionButton(s));
+  if (state.isLocal && !DEMO) {   // "Đổi đồ": the person's own clothes (ui/wardrobe.js)
+    const b = el('button', 'btn btn--sm', tr('drawer.wear.open')); b.type = 'button'; b.title = tr('drawer.wear.title'); b.setAttribute('aria-pressed', String(wearFor === s.id));
+    b.addEventListener('click', () => { wearFor = wearFor === s.id ? null : s.id; renderActions(); });
+    box.append(b);
+    if (wearFor === s.id) box.append(wardrobePanel(s, renderActions));
+  }
   box.append(...acctActions(s, renderActions));
   if (s.link) {
     const a = el('a', 'btn btn--primary btn--sm', tr('drawer.openOnClaude')); a.href = s.link; a.target = '_blank'; a.rel = 'noopener';

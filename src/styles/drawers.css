@@ -39,6 +39,14 @@
 .acct-opt:disabled { opacity: .5; cursor: default; }
 .dr-actions > .pa-code { flex-basis: 100%; margin-top: 0; }
 .dr-actions > .dr-qr { flex-basis: auto; margin: 0; }
+.dr-actions > .dr-wear { flex-basis: 100%; display: flex; flex-direction: column; gap: 7px; padding: 10px; border-radius: 10px; background: var(--card-2); }
+.dr-wear-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.dr-wear-l { flex-basis: 100%; font-size: .72rem; color: var(--muted); }
+.dr-wear-sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); cursor: pointer; padding: 0; }
+.dr-wear-sw.is-on { border-color: var(--ink); }
+.dr-wear-chip { font: inherit; font-size: .74rem; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line, rgba(0,0,0,.15)); background: var(--card); color: var(--ink); cursor: pointer; }
+.dr-wear-chip.is-on { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.dr-wear > .btn { align-self: flex-start; }
 .counts { list-style: none; margin: 0; padding: 14px 18px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .counts li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px 9px; text-align: center; display: flex; flex-direction: column; gap: 4px; }
 .counts b { font-size: 1.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }

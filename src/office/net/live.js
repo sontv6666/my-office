@@ -8,6 +8,7 @@ import { CHAIR_IDLE, DESKS, PODS, UNITS, chairs, unitOfDesk } from '../world/des
 import { canvasTex } from '../scene/blocks.js';
 import { DEPTS } from '../world/layout.js';
 import { DEPT_SIGNS } from '../world/pro/wing.js';
+import { lookOf, wearOn } from '../../shared/look.js';
 import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, spawnSub, subs, workers } from '../people/workers.js';
 import { queueUi } from '../ui/activity.js';
 import { closeSession } from '../ui/session-drawer.js';
@@ -38,11 +39,12 @@ function remember(proj, u) {
   try { localStorage.setItem(AREAS_KEY, JSON.stringify(homes)); } catch { /* storage blocked */ }
 }
 const near = (a, b) => { const A = UNITS[a], B = UNITS[b]; return A.pod != null && B.pod != null ? Math.abs(A.pod - B.pod) * 2 + (A.side === B.side ? 0 : 1) : Math.abs(a - b); };
+/** an area's desks in the order it fills them */
+const seatsOf = (u) => (UNITS[u].desks.length > 4 ? SEAT_ORDER.slice(0, UNITS[u].desks.length) : UNITS[u].desks.map((_, k) => k)).map((k) => UNITS[u].desks[k]);
 function proDesk(s) {
   if (deskOf.has(s.id)) return deskOf.get(s.id);
   const used = new Set(deskOf.values()), proj = projOf(s);
-  const order = (u) => (UNITS[u].desks.length > 4 ? SEAT_ORDER.slice(0, UNITS[u].desks.length) : UNITS[u].desks.map((_, k) => k));
-  const free = (u) => order(u).map((k) => UNITS[u].desks[k]).filter((d) => !used.has(d));
+  const free = (u) => seatsOf(u).filter((d) => !used.has(d));
   const empty = (u) => free(u).length === UNITS[u].desks.length;
   const all = UNITS.map((_, u) => u), mine = all.filter((u) => rowTeam.get(u) === proj);
   const claim = (u) => { rowTeam.set(u, proj); remember(proj, u); return free(u)[0]; };
@@ -99,7 +101,9 @@ function reportLook(s) {
   looksTimer = setTimeout(() => {
     looksTimer = 0;
     const items = [...looksDue.entries()].map(([id, x]) => ({ id, ...x })); looksDue.clear();
-    fetch('/api/mydesk/looks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }).catch(() => {});
+    // (with the areas and where each project sat before: the server guesses a newcomer's desk until this page sees it)
+    const layout = { units: UNITS.map((_, u) => seatsOf(u)), homes, look: state.LOOK || 'pixar' };
+    fetch('/api/mydesk/looks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, layout }) }).catch(() => {});
   }, 800);
 }
 // What each person is doing right now (asleep, at the coffee machine, typing…), so MyDesk's desk window can show the
@@ -125,6 +129,12 @@ export function upsertSession(s, walkIn = true) {
   if (!w && !leavingIds.has(s.id)) w = addWorker(s, walkIn && had === false && state.connectedOnce);
   if (w) {
     w.setName(short(dn(s), 26));
+    const wearKey = JSON.stringify(s.wear || null);
+    if (w.wearKey !== wearKey) {   // its clothes changed ("Đổi đồ", ui/wardrobe.js): the person drawn again
+      w.wearKey = wearKey;
+      const cfg = { ...w.cfg }; delete cfg.outfit; delete cfg.pants;
+      w.cfg = { ...cfg, ...wearOn(lookOf(s), s.wear) }; w.rebuild();
+    }
     const live = new Set((s.subs || []).map((x) => x.id));
     for (const [aid, sw] of subs) if (sw.parent === w && !live.has(aid)) dropSub(aid);
     for (const x of s.subs || []) { if (!subs.has(x.id)) spawnSub(w, x.id, x.type); const sw = subs.get(x.id); if (sw && x.desc) sw.desc = x.desc; }
