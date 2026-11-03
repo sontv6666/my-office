@@ -38,7 +38,8 @@ export default {
     atDesks: '{n} pinned at desks', none: 'No open tasks',
     hint: '{todo} to do · {doing} doing · {review} in review · {done} done',
     close: 'Close', emptySheet: 'No tasks yet — make them in MyDesk › Projects.',
-    foot: 'Tasks and their stages are managed in MyDesk › Projects.',
+    foot: 'Click a task to open it in MyDesk › Projects.',
+    open: 'Open in MyDesk', openFailed: "Couldn't reach MyDesk to open it.",
   },
   // the to-dos the demo starts with
   demo: {

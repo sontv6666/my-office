@@ -91,7 +91,9 @@
 .tbs-ch { margin: 0 0 8px; font-size: 13px; font-weight: 700; }
 .tbs-col--review .tbs-ch { color: #0f9488; } .tbs-col--doing .tbs-ch { color: #2563eb; } .tbs-col--done .tbs-ch { color: #16a34a; }
 .tbs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.tbs-task { background: var(--panel, #fff); border: 1px solid rgba(127, 127, 127, .2); border-radius: 8px; padding: 7px 9px; display: grid; gap: 2px; }
+.tbs-task { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--panel, #fff); border: 1px solid rgba(127, 127, 127, .2); border-radius: 8px; padding: 7px 9px; display: grid; gap: 2px; }
+.tbs-task:hover, .tbs-task:focus-visible { border-color: #2563eb; outline: none; }
+.tbs-task:disabled { cursor: default; }
 .tbs-title { font-weight: 600; overflow-wrap: anywhere; }
 .tbs-meta, .tbs-empty, .tbs-foot, .tbs-none { color: var(--muted, #5d6675); font-size: 12px; }
 .tbs-foot { margin: 12px 0 0; }

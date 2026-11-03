@@ -124,3 +124,17 @@ test('board(): moves from the feed after the first read, the claimant mapped to 
   assert.deepEqual(boardFor(raw, (sid) => (sid === 'sid-a' ? 'office-a' : null)).moves.map((m) => [m.seq, m.kind, m.to]), [[12, 'claim', 'office-a'], [13, 'review', 'office-a']]);
   assert.deepEqual(boardFor(raw, () => null).moves, [], 'a claimant not on the floor moves nothing');
 });
+
+test('open(): asks the linked MyDesk to show a page; false when not linked or MyDesk does not answer', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-open-'));
+  const posts = [];
+  const fetchImpl = async (u, init) => {
+    if (init && init.method === 'POST') { posts.push([String(u), JSON.parse(init.body)]); return new Response('{"ok":true}', { status: 200 }); }
+    return new Response('[]', { status: 200 });
+  };
+  const md = createMyDesk({ dataDir: dir, fetchImpl, env: {}, everyMs: 0 });
+  assert.equal(await md.open('#/projects/p1?task=t1'), false, 'not linked yet');
+  md.link('http://127.0.0.1:3000');
+  assert.equal(await md.open('#/projects/p1?task=t1'), true);
+  assert.deepEqual(posts.at(-1), ['http://127.0.0.1:3000/api/navigate', { hash: '#/projects/p1?task=t1' }]);
+});

@@ -2266,6 +2266,17 @@ const server = http.createServer((req, res) => {
   }
   // MyDesk's Projects board for the office wall (ui/task-board.js): its tasks, each claim turned into the office's own
   // session id; { ok: false } when there is none (not linked, MyDesk gone, its projects not set up). This computer only.
+  // a task clicked in the board sheet (ui/task-board-sheet.js): MyDesk opens it in its Projects page
+  if (url.pathname === '/api/mydesk/open' && req.method === 'POST') {
+    if (!isLoopback(req) || !sameOriginOf(req) || !String(req.headers['content-type'] || '').startsWith('application/json')) { json(res, 403, { ok: false }); return; }
+    readJson(req).then(async (b) => {
+      const id = (v) => (typeof v === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(v) ? v : '');
+      const p = id(b?.projectId), t = id(b?.taskId);
+      if (!p) { json(res, 400, { ok: false }); return; }
+      json(res, 200, { ok: await mydesk.open(`#/projects/${p}${t ? `?task=${t}` : ''}`) });
+    });
+    return;
+  }
   if (url.pathname === '/api/mydesk/board' && req.method === 'GET') {
     if (!isLoopback(req)) { res.writeHead(403).end(); return; }
     mydesk.board().then((raw) => {

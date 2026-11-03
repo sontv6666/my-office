@@ -3,17 +3,29 @@
 // (shared/task-board.js), no extra fetch. Esc, the × or a click outside closes it. Nothing here moves.
 import { el } from '../core/env.js';
 import { dn, sessions } from '../people/workers.js';
+import { toast } from './activity.js';
 import { t as tr } from '../../i18n/index.js';
 
 let root = null;
 
 function close() { if (root) { root.remove(); root = null; } }
 
+async function openInMyDesk(t) {
+  try {
+    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: t.projectId, taskId: t.id }) });
+    const ok = r.ok && (await r.json()).ok;
+    if (ok) close(); else toast(tr('board.tasks.openFailed'), 4000);
+  } catch { toast(tr('board.tasks.openFailed'), 4000); }
+}
+
 function row(t, projects, holder) {
-  const li = el('li', 'tbs-task');
-  li.append(el('span', 'tbs-title', t.title || t.id));
+  const li = el('li');
+  const b = el('button', 'tbs-task'); b.type = 'button'; b.title = tr('board.tasks.open');
+  b.append(el('span', 'tbs-title', t.title || t.id));
   const meta = [projects.get(t.projectId), holder].filter(Boolean).join(' · ');
-  if (meta) li.append(el('span', 'tbs-meta', meta));
+  if (meta) b.append(el('span', 'tbs-meta', meta));
+  if (t.projectId) b.addEventListener('click', () => openInMyDesk(t)); else b.disabled = true;
+  li.append(b);
   return li;
 }
 

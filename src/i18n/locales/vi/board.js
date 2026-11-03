@@ -34,7 +34,8 @@ export default {
     atDesks: '{n} việc ghim trên bàn', none: 'Không có việc nào đang mở',
     hint: '{todo} cần làm · {doing} đang làm · {review} chờ duyệt · {done} xong',
     close: 'Đóng', emptySheet: 'Chưa có việc nào — tạo trong MyDesk › Projects.',
-    foot: 'Việc và trạng thái được quản lý trong MyDesk › Projects.',
+    foot: 'Bấm vào một việc để mở nó trong MyDesk › Projects.',
+    open: 'Mở trong MyDesk', openFailed: 'Không kết nối được MyDesk để mở.',
   },
   demo: {
     d1: 'Trả lời email khách về bảng giá',
