@@ -17,6 +17,7 @@ import { lite } from '../ui/lite.js';
 import { particles, rocketState, updateRoom } from '../world/room-update.js';
 import { updateMarkers } from '../ui/activity.js';
 import { updateNeedsYou } from '../ui/needs-you.js';
+import { updateNeedsBoard } from '../ui/needs-board.js';
 import { setView } from '../ui/camera-bar.js';
 import { updateProps } from '../interact/props.js';
 import { updateErrands } from '../people/errands.js';
@@ -187,6 +188,7 @@ export function loop(now = 0) {
   updateZs(dt);
   updateMarkers(state.sim);
   updateNeedsYou(state.sim);
+  updateNeedsBoard(state.sim);
   updateTips();
   if (fp.on) {
     fpUpdate(dt0);

@@ -95,6 +95,8 @@ function prop(id, def) {
   p.boxes = p.meshes.map((m) => new THREE.Box3().setFromObject(m));
   PROPS.set(id, p); return p;
 }
+/** A piece of furniture another module builds (its meshes in place): pointed at, outlined and clicked like the rest. */
+export const addProp = (id, def) => prop(id, def);
 /* small reactions */
 const bounces = [];
 function bounce(g) { if (!reduceMotion && g && !bounces.some((b) => b.g === g)) bounces.push({ g, t: 0, base: g.scale.clone() }); }

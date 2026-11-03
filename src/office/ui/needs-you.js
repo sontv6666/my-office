@@ -34,6 +34,8 @@ const markTex = new Map();  // 'error' | 'review:#rrggbb' -> texture
 
 /** What session `id` holds for you now ('wait' | 'error' | 'review' | ''). */
 export const attentionNow = (id) => held.get(id) || '';
+/** Everyone holding something for you now: [[session id, 'wait' | 'error' | 'review'], …] (the wall's board, ui/needs-board.js). */
+export const attentionAll = () => [...held];
 
 /** A session update (net/live.js upsertSession): `prev` its status before. fx: a live change (not the first snapshot,
     not a replayed backlog); viaEvent: the update came with its own wait/ask event (life/incidents.js raises the hand,

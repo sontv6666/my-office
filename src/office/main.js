@@ -89,6 +89,7 @@ import * as interactProps from './interact/props.js';
 import * as interactPlaceChips from './interact/place-chips.js';
 import * as interactPlaceCards from './interact/place-cards.js';
 import * as uiWhiteboard from './ui/whiteboard.js';
+import * as uiNeedsBoard from './ui/needs-board.js';
 import * as uiLookSwitch from './ui/look-switch.js';
 import * as uiSettings from './ui/settings.js';
 import * as uiWrapped from './ui/wrapped.js';
@@ -204,6 +205,7 @@ const MODULES = [
   interactPlaceChips,
   interactPlaceCards,
   uiWhiteboard,
+  uiNeedsBoard,
   uiLookSwitch,
   uiSettings,
   uiWrapped,

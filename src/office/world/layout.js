@@ -28,14 +28,14 @@ export function setup() {
      all around an open-plan dev floor. Furniture both plans share is placed from this table. */
   LAY = PRO ? {
     box: { x0: -8, x1: 14, z0: -8, z1: HQ ? WING.z1 : 9 }, center: HQ ? [3, 9] : [3, 0.5],
-    shelf: [4.95, -7.62, 0], globe: [8.0, -6.55], board: [-3.42, 2.05, 7.25, 0], doorZ: 3.3, clock: [-7.96, 2.15, 1.7, Math.PI / 2],
+    shelf: [4.95, -7.62, 0], globe: [8.0, -6.55], board: [-3.42, 2.05, 7.25, 0], needs: [-3.5, 1.86, 4.78, 0, 1.45], doorZ: 3.3, clock: [-7.96, 2.15, 1.7, Math.PI / 2],
     racks: [-7.55, -1.47, Math.PI / 2], tv: [-7.96, 3.35, -1.47, Math.PI / 2], neon: [0.2, 3.62, -7.97, 0], rocket: [13.15, 1.75],
     coffee: [10.6, -7.45, Math.PI], aq: [10.45, 8.45], arc: [13.4, 8.45], prn: [-3.15, 0.55],
     lost: [-5.2, -0.62, Math.PI / 2 - 0.5], lostTag: [-5.2, 0.85, -0.3], sofa: [11.0, 3.95, 2.2, Math.PI], gameTv: [11.0, 0.9],
     bil: [12.85, 6.2], ktv: [-0.75, 7.4, Math.PI / 2],   // the pool table (the lounge's right side) and the karaoke box (where the front phone booth was)
   } : {
     box: { x0: -8, x1: 8, z0: -6, z1: 6 }, center: [0, 0],
-    shelf: [-5.2, -5.62, 0], globe: [0.6, -5.0], board: [-7.94, 2.05, -2.6, 0], doorZ: 1.5, clock: [-2.45, 3.05, -5.96, 0],
+    shelf: [-5.2, -5.62, 0], globe: [0.6, -5.0], board: [-7.94, 2.05, -2.6, 0], needs: [-7.94, 1.9, -0.28, 0, 1.2], doorZ: 1.5, clock: [-2.45, 3.05, -5.96, 0],
     racks: [5.5, -5.5, 0], tv: [5.55, 3.3, -5.96, 0], neon: [-5.2, 3.62, -5.97, 0], rocket: [7.25, -3.6],
     coffee: [-5.55, 5.3, 0], aq: [1.35, 5.3], arc: [-1.45, 5.42], prn: [-3.15, 5.4],
     lost: [4.18, -4.95, 0.5], lostTag: [4.12, 0.85, -4.6], sofa: [-2.15, -5.5, 2.1, 0],
