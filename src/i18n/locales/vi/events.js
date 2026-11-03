@@ -41,7 +41,7 @@ export default {
     ciGreenDefault: 'kiểm thử qua',
     start: 'mở session',
     end: 'đóng session',
-    substart: 'trợ lý {label} vào phòng họp',
+    substart: 'trợ lý {label} vào việc, ngồi cạnh sếp',
     substop: 'trợ lý {label} báo cáo xong',
     test: 'chạy test: {label} 🧪',
     testok: 'test qua hết ✅ ({label})',

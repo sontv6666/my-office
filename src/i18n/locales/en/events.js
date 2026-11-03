@@ -48,7 +48,7 @@ export default {
     ciGreenDefault: 'tests passing',
     start: 'session opened',
     end: 'session closed',
-    substart: 'subagent {label} joins the meeting room',
+    substart: 'subagent {label} starts, beside its boss',
     substop: 'subagent {label} reports back',
     test: 'run the tests: {label} 🧪',
     testok: 'tests pass ✅ ({label})',

@@ -18,6 +18,7 @@ import { COFFEE_Q, hideMeal, joinCoffee, leaveCoffee, showMeal } from './breaks.
 import { blocked, fp } from '../interact/first-person.js';
 import { sfx } from '../audio/sfx.js';
 import { finishLine, lastFinish } from '../life/finish.js';
+import { flyEnvelope } from './envelopes.js';
 import { t as tr } from '../../i18n/index.js';
 
 /* ---------- workers ---------- */
@@ -97,26 +98,27 @@ export function spawnSub(parent, agentId, type, instant = false, info = null) {
   const w = new Worker({ name: type || 'agent', shirt: tint(parent.cfg.shirt, 0.3), hair: HAIRS[h % HAIRS.length], style: STYLES[(h >>> 3) % STYLES.length], acc: (h >>> 6) % 3 === 0 ? 'glasses' : null, pants: '#4C566A' }, { sub: true, scale: 0.78, parent, id: agentId });
   subs.set(agentId, w);
   const x = () => info || sessions.get(parent.id)?.subs?.find((y) => y.id === agentId);
-  const seated = () => {
-    w.station = 'meeting'; w.anim = 'think';
+  // its place: beside its parent's desk (people/workers.js subSeat), not a shared table, so whose it is reads at a glance
+  const seat = w.homeSpot();
+  w.pos.set(seat.x, seat.z); w.spot = seat; w.face = w.faceTarget = seat.face; w.pose = 'stand'; w.station = 'desk';
+  if (instant) {   // already working when the page opened: there, at its last step
+    w.anim = 'think';
     const i = x();
     if (i?.last) w.say(i.last.type, i.last.label || verb(i.last)); else w.say('agent', i?.desc || type || 'agent');
-  };
-  if (instant) {   // already working when the page opened: straight to where its last step happens
-    const seat = allocate('meeting', w);
-    if ('by' in seat) seat.by = w;
-    w.pos.set(seat.x, seat.z); w.spot = seat; w.face = w.faceTarget = seat.face; w.pose = seat.sit ? 'sit' : 'stand'; seated();
-    const last = x()?.last; if (last && ACT[last.type]) w.push(subAct({ type: last.type, label: last.label }));
+    const last = i?.last; if (last && ACT[last.type]) w.push(subAct({ type: last.type, label: last.label }));
     return w;
   }
-  // new on the team: in through the door (up in the lift), to the boss for the brief, then off to work
-  w.pos.set(DOOR_OUT.x, DOOR_OUT.z); w.face = w.faceTarget = Math.PI / 2; w.spot = DOOR_OUT; liftArrive(w);
-  w.goTo(DOOR_IN, () => w.goTo(nearBoss(parent, w), () => {
+  // new on the team: its brief flies from the parent to that place in an envelope (people/envelopes.js); it is there
+  // when the envelope lands, turned to its parent, and says what it is on
+  w.offstage = true; w.anim = 'idle';
+  const at = (o, y) => ({ x: o.x, y, z: o.z });
+  flyEnvelope(at({ x: parent.pos.x, z: parent.pos.y }, 1.5 + parent.gy()), at(seat, 1.3), 'spawn', () => {
+    w.offstage = false;
+    if (subs.get(agentId) !== w) return;   // (done before it got there)
     w.faceTarget = Math.atan2(parent.pos.x - w.pos.x, parent.pos.y - w.pos.y);
-    w.anim = 'idle'; w.say('agent', tr('people.subOnIt', { task: short(x()?.desc || type || tr('people.subagent'), 48) })); w.dwellUntil = state.sim + 1.6;
-    if (!parent.leaving && parent.phase !== 'walk') parent.faceTarget = Math.atan2(w.pos.x - parent.pos.x, w.pos.y - parent.pos.y);
+    w.say('agent', tr('people.subOnIt', { task: short(x()?.desc || type || tr('people.subagent'), 48) })); w.dwellUntil = state.sim + 1.6;
     if (!w.want) w.push({ station: 'desk', anim: 'think', type: 'agent', text: x()?.desc || tr('people.subThinking'), dwell: 1.2 });
-  }));
+  });
   return w;
 }
 // What a subagent does for one of its steps: the same places as everyone (library, server room, window), its "desk"
@@ -125,15 +127,25 @@ export function subAct(e) {
   const a = ACT[e.type] || ACT.other;
   return { ...a, type: ACT[e.type] ? e.type : 'other', text: bubbleText(e), e, dwell: Math.max(2.5, a.dwell || 0), kind: e.type === 'fail' ? 'fail' : a.kind };
 }
-// A free place to stand next to the boss (behind or beside, never inside their desk), clear of other people.
-export function nearBoss(boss, me) {
-  const f = boss.face, others = [...workers.values(), ...subs.values(), ...leaving, ...npcs].filter((o) => o !== me && o !== boss).map((o) => (o.spot ? [o.spot.x, o.spot.z] : [o.pos.x, o.pos.y]));
+// A free place to stand next to the boss (behind or beside, never inside their desk), clear of other people (and of
+// the places their subagents keep). `at`: round that place ({ x, z, face }) instead of where the boss stands now.
+export function nearBoss(boss, me, at = null) {
+  const o0 = at || { x: boss.pos.x, z: boss.pos.y, face: boss.face };
+  const others = [...workers.values(), ...subs.values(), ...leaving, ...npcs].filter((o) => o !== me && o !== boss)
+    .flatMap((o) => [o.spot ? [o.spot.x, o.spot.z] : [o.pos.x, o.pos.y], ...(o.seat ? [[o.seat.x, o.seat.z]] : [])]);
+  if (at) others.push([boss.pos.x, boss.pos.y]);
+  const f = o0.face;
   for (const r of [0.95, 1.4, 1.9]) for (const da of [Math.PI, Math.PI / 2, -Math.PI / 2, (3 * Math.PI) / 4, -(3 * Math.PI) / 4, Math.PI / 4, -Math.PI / 4, 0]) {
-    const a = f + da, x = boss.pos.x + Math.sin(a) * r, z = boss.pos.y + Math.cos(a) * r;
+    const a = f + da, x = o0.x + Math.sin(a) * r, z = o0.z + Math.cos(a) * r;
     if (!inside(x, z) || (fp.grid && blocked(x, z, 0.28))) continue;
-    if (others.every(([ox, oz]) => Math.hypot(ox - x, oz - z) >= 0.85)) return { x, z, face: Math.atan2(boss.pos.x - x, boss.pos.y - z), node: nearestNode(new V2(x, z)) };
+    if (others.every(([ox, oz]) => Math.hypot(ox - x, oz - z) >= 0.85)) return { x, z, face: Math.atan2(o0.x - x, o0.z - z), node: nearestNode(new V2(x, z)) };
   }
   return allocate('meeting', me);
+}
+// A subagent's own place: beside its parent's desk (its chair), kept while it works; a parent without a desk: beside it.
+export function subSeat(parent, me) {
+  const d = sessions.get(parent?.id)?.desk ?? -1;
+  return d >= 0 ? nearBoss(parent, me, DESK_SPOTS[d]) : parent ? nearBoss(parent, me) : allocate('meeting', me);
 }
 // Workers walking out of the office: no longer in workers/subs, but still animated until they reach the door.
 export const leaving = new Set();
@@ -244,7 +256,10 @@ export function setup() {
       this.bubbleObj.visible = true;
     }
     hush() { this.bubbleObj.visible = false; }
-    homeSpot() { const d = sessions.get(this.id)?.desk ?? -1; return d >= 0 ? DESK_SPOTS[d] : allocate('meeting', this); }
+    homeSpot() {
+      if (this.sub) return (this.seat ||= subSeat(this.parent, this));   // (a subagent: beside its parent's desk)
+      const d = sessions.get(this.id)?.desk ?? -1; return d >= 0 ? DESK_SPOTS[d] : allocate('meeting', this);
+    }
     goTo(spot, cb) {
       if (this.mealBox) hideMeal(this);
       if (this.queued && !COFFEE_Q.includes(spot)) leaveCoffee(this);

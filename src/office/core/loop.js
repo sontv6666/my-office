@@ -7,6 +7,7 @@ import { updateExtras } from '../world/props/update.js';
 import { leaving, npcs, subs, updateZs, workers } from '../people/workers.js';
 import { updateTeam } from '../people/team-lines.js';
 import { flights, updateFlights } from '../people/director.js';
+import { envelopesFlying, updateEnvelopes } from '../people/envelopes.js';
 import { updateWeather } from '../life/weather.js';
 import { updateNap } from '../life/nap.js';
 import { updateQuota } from '../life/quota.js';
@@ -64,7 +65,7 @@ const clock = new THREE.Clock();
 // walks, else every fourth.
 let lastFrame = 0, lastInput = 0, frameNo = 0;
 const _camDelta = new THREE.Vector3();
-const walkingNow = () => { for (const w of workers.values()) if (w.phase === 'walk') return true; for (const w of subs.values()) if (w.phase === 'walk') return true; for (const w of npcs) if (w.phase === 'walk') return true; return leaving.size > 0 || flights.length > 0; };
+const walkingNow = () => { for (const w of workers.values()) if (w.phase === 'walk') return true; for (const w of subs.values()) if (w.phase === 'walk') return true; for (const w of npcs) if (w.phase === 'walk') return true; return leaving.size > 0 || flights.length > 0 || envelopesFlying() > 0; };
 function frameGap(now) {
   if (SOFTWARE_GL) return 1000 / 5;
   if (state.covered) return 1000 / 2;   // (a phone's full-screen sheet over it, the chat say: nobody sees the office, its CPU goes to the sheet)
@@ -153,6 +154,7 @@ export function loop(now = 0) {
   for (const w of npcs) w.update(dt, state.sim);
   if (PERF) lap('people');
   updateFlights(dt);
+  updateEnvelopes(dt);
   updateRoom(dt, state.sim);
   updateExtras(dt, state.sim);
   updateProps(dt, state.sim);
