@@ -246,7 +246,7 @@ export function applyMsg(d, quiet = false) {
   } else if (d.k === 'sess') { upsertSession(d.s, !quiet); if (d.stats) state.stats = d.stats; }
   else if (d.k === 'gone') { if (!quiet) chatLeft(sessions.get(d.id)); (quiet ? dropSessionNow : removeSession)(d.id); }
   else if (d.k === 'ev') {
-    if (d.stats) state.stats = d.stats; upsertSession(d.s, !quiet);
+    if (d.stats) state.stats = d.stats; upsertSession(d.s, !quiet, quiet ? null : d.e);
     if (!quiet) onEvent(d.e); else if (!d.e.quiet && d.e.type !== 'start') addFeed(d.e);
   }
   else if (d.k === 'stats') { state.stats = d.stats; if (d.s) upsertSession(d.s, !quiet); }

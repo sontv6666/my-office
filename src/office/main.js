@@ -80,6 +80,7 @@ import * as worldRoomUpdate from './world/room-update.js';
 import * as uiActivity from './ui/activity.js';
 import * as uiSessionDrawer from './ui/session-drawer.js';
 import * as uiCameraBar from './ui/camera-bar.js';
+import * as uiNeedsYou from './ui/needs-you.js';
 import * as uiMacDrawer from './ui/mac-drawer.js';
 import * as uiBurn from './ui/burn.js';
 import * as uiTopbar from './ui/topbar.js';
@@ -193,6 +194,7 @@ const MODULES = [
   uiActivity,
   uiSessionDrawer,
   uiCameraBar,
+  uiNeedsYou,
   uiMacDrawer,
   uiBurn,
   uiTopbar,

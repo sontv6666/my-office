@@ -10,6 +10,7 @@ import { openSession, renderActivity, renderSessionHead, renderSubs, tab, toggle
 import { macSnap } from './mac-drawer.js';
 import { queuePlace } from '../interact/place-cards.js';
 import { unseenDone } from '../life/your-turn.js';
+import { attentionNow } from './needs-you.js';
 import { whereabouts } from '../people/outings.js';
 import { imageUrl, openImage } from './image-view.js';
 import { t as tr, num } from '../../i18n/index.js';
@@ -106,6 +107,9 @@ export function doingOf(s) {
   if (s.stuck && s.status !== 'rest') return { ic: 'alert', text: tr(`activity.doing.stuck.${s.stuck.kind}`, { label: s.stuck.label.length > 40 ? `${s.stuck.label.slice(0, 39)}…` : s.stuck.label }), stuck: true };
   const where = whereabouts(workers.get(s.id));   // out of the office: at the shop, on the way home…
   if (where) return where;
+  const held = attentionNow(s.id);   // (a failed turn, or done and not looked at: until it works again, ui/needs-you.js)
+  if (held === 'error') return { ic: 'alert', text: tr('activity.doing.error') };
+  if (held === 'review') return { ic: 'check', text: tr('activity.doing.review') };
   if (s.status === 'rest' && s.bg?.length) return { ic: 'terminal', text: `${tr('activity.doing.bg', { desc: s.bg[0].desc })}${s.bg.length > 1 ? ` (+${s.bg.length - 1})` : ''}` };
   if (s.status === 'rest') return { ic: 'zzz', text: nowMs() - (s.lastAt || 0) < 90e3 ? tr('activity.doing.justDone') : tr('activity.doing.resting', { time: ago(s.lastAt) }) };
   if (s.last) return { ic: TYPE_ICON[s.last.type] || 'sparkle', text: cap(verb(s.last)) };
@@ -252,7 +256,7 @@ export function updateMarkers(t) {
   if (hoverRing.visible) { hoverRing.position.set(state.hovered.pos.x, 0.025 + state.hovered.gy(), state.hovered.pos.y); hoverRing.scale.setScalar(state.hovered.sub ? 0.8 : 1); }
   for (const w of workers.values()) {
     const s = sessions.get(w.id);
-    const show = w.root.visible && (!s || s.status !== 'rest' || w.id === state.selectedId || w === state.hovered || w.phase === 'walk');
+    const show = w.root.visible && (!s || s.status !== 'rest' || !!attentionNow(w.id) || w.id === state.selectedId || w === state.hovered || w.phase === 'walk');
     if (w.tagObj.visible !== show) w.tagObj.visible = show;
     const wait = s?.status === 'wait';
     if (w.tagEl.classList.contains('tag--wait') !== wait) w.tagEl.classList.toggle('tag--wait', wait);

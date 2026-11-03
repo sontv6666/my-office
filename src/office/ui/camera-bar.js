@@ -3,7 +3,7 @@ import { state } from '../core/state.js';
 import { $, HQ, PRO } from '../core/env.js';
 import { BASE_ZOOM, camera, controls, fpCam } from '../scene/renderer.js';
 import { queueUi, toast } from './activity.js';
-import { drS } from './session-drawer.js';
+import { drS, openSession } from './session-drawer.js';
 import { exitFp, fp } from '../interact/first-person.js';
 import { focusTarget } from '../core/loop.js';
 import { t as tr } from '../../i18n/index.js';
@@ -17,6 +17,14 @@ export function panTo(w) {
   if (!panBack) panBack = focusTarget.clone();
   focusTarget.set(w.pos.x, 0.9, w.pos.y);
   clearTimeout(panTimer); panTimer = setTimeout(() => { if (panBack && !state.selectedId) focusTarget.copy(panBack); panBack = null; }, 7000);
+}
+// You asked to see someone (a "needs you" chip at the stage's edge, ui/needs-you.js): the camera goes there and stays.
+// Someone else's drawer open: theirs instead (the camera follows whoever is open).
+export function showPerson(w) {
+  if (fp.on) return;
+  if (state.selectedId) { if (state.selectedId !== w.id) openSession(w.id); return; }
+  panBack = null; clearTimeout(panTimer); state.lastUserCam = performance.now();
+  focusTarget.set(w.pos.x, 0.9, w.pos.y);
 }
 export function goView(v) { const V = VIEWS[v]; focusTarget.set(...V.t); state.zoomGoal = V.z * BASE_ZOOM; setView(v); }
 

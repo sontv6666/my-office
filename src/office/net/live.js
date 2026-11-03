@@ -12,6 +12,7 @@ import { lookOf, wearOn } from '../../shared/look.js';
 import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, spawnSub, subs, workers } from '../people/workers.js';
 import { queueUi } from '../ui/activity.js';
 import { closeSession } from '../ui/session-drawer.js';
+import { noteGone, noteStatus } from '../ui/needs-you.js';
 import { t as tr } from '../../i18n/index.js';
 
 export let TOKEN;
@@ -120,10 +121,11 @@ function reportActivity() {
   fetch('/api/mydesk/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: pageId, items }) }).catch(() => {});
 }
 if (typeof window !== 'undefined' && !new URLSearchParams(location.search).has('demo')) setInterval(reportActivity, 1000);
-export function upsertSession(s, walkIn = true) {
+// e: the event this update came with (an 'ev' message), if any
+export function upsertSession(s, walkIn = true, e = null) {
   s.desk = proDesk(s);   // (every layout: the project's area)
   reportLook(s);
-  const had = sessions.has(s.id);
+  const had = sessions.has(s.id), prev = sessions.get(s.id)?.status;
   sessions.set(s.id, s);
   let w = workers.get(s.id);
   if (!w && !leavingIds.has(s.id)) w = addWorker(s, walkIn && had === false && state.connectedOnce);
@@ -142,6 +144,8 @@ export function upsertSession(s, walkIn = true) {
     w.setAcct(s.acct);
     w.setStuck(s.stuck);
   }
+  // waiting for you, failed, done and not looked at (ui/needs-you.js): a live change raises the hand, sounds, pans
+  noteStatus(s, prev, { fx: walkIn && prev !== undefined && state.connectedOnce, viaEvent: !!e && !e.agent && (e.type === 'wait' || e.type === 'ask') });
   queueUi();
 }
 export function removeSession(id) {
@@ -154,6 +158,7 @@ export function removeSession(id) {
   }
   if (s && s.desk >= 0) chairs[s.desk].color.set(CHAIR_IDLE);
   if (state.selectedId === id) closeSession();
+  noteGone();
   queueUi();
 }
 

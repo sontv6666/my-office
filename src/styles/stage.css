@@ -70,3 +70,10 @@
 /* walking in: the moment's black while the lift goes down to the street (or back up) */
 .fp-fade { position: absolute; inset: 0; z-index: 4; background: #05070A; opacity: 0; pointer-events: none; transition: opacity .32s ease; }
 .fp-fade.on { opacity: 1; }
+/* someone waiting for you out of view (ui/needs-you.js): a chip at the stage's edge pointing their way; a click brings the camera there */
+.ny-edges { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.ny-edge { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; font: 600 12px/1 var(--font); color: #EEF1F7; background: rgba(14, 19, 27, .88); border: 1px solid var(--amber); border-radius: 999px; box-shadow: 0 0 0 3px var(--amber-soft), 0 6px 16px rgba(0, 0, 0, .35); cursor: pointer; white-space: nowrap; }
+.ny-edge:hover, .ny-edge:focus-visible { background: rgba(28, 34, 44, .94); outline: none; }
+.ny-edge[hidden] { display: none; }
+.ny-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.ny-arrow { width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--amber); }
