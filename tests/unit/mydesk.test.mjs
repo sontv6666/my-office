@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTag, castOf, createMyDesk, officeStatus } from '../../server/mydesk.mjs';
+import { agentTag, applyMydesk, castOf, createMyDesk, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'office-mydesk-'));
 const agent = (over) => ({ id: 'a', sessionId: 'a', name: 'alpha', status: 'working', providerId: 'claude', metadata: { projectPath: 'D:\\w\\app', isSubagent: false }, ...over });
@@ -27,9 +27,10 @@ test('the cast: Claude sessions by session id, other CLIs as records, subagents 
     null, { name: 'no id' },
   ]);
   assert.deepEqual([...c.claude], ['s1']);
+  const md = (state) => ({ state, unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
   assert.deepEqual(c.external, [
-    { id: 's1', name: 'alpha', cwd: 'D:\\w\\app', status: 'work', agent: '', tool: '' },   // (the stand-in if the office has no s1)
-    { id: 'cx', name: 'codex-1', cwd: 'D:\\w\\app', status: 'wait', agent: 'codex', tool: 'shell' },
+    { id: 's1', name: 'alpha', cwd: 'D:\\w\\app', status: 'work', agent: '', tool: '', md: md('working') },   // (the stand-in if the office has no s1)
+    { id: 'cx', name: 'codex-1', cwd: 'D:\\w\\app', status: 'wait', agent: 'codex', tool: 'shell', md: md('help') },
   ]);
   assert.deepEqual(castOf('nope'), { claude: new Set(), external: [] });
 });
@@ -80,4 +81,41 @@ test('MyDesk gone (3 failed reads): back to every session', async () => {
   await m.poll();
   assert.equal(m.allows('other'), true);
   assert.equal(changes.at(-1), null);
+});
+
+test("MyDesk's own record rides along: an error is not a rest, done-but-unreviewed, the parent, the warning, the colour", () => {
+  const [x] = castOf([agent({ status: 'error', unreviewed: true, toolWarning: true, projectColor: '#38BDF8', metadata: { projectPath: 'D:\\w', parentId: 'boss' } })]).external;
+  assert.equal(x.status, 'rest', 'the office still has its three');
+  assert.deepEqual(x.md, { state: 'error', unreviewed: true, parentId: 'boss', toolWarning: true, projectColor: '#38bdf8' });
+  assert.equal(castOf([agent({ status: 'completed', unreviewed: true })]).external[0].md.state, 'completed');
+  // (whatever MyDesk sends, the page gets a plain record)
+  assert.deepEqual(mydeskInfo({ status: '<b>x</b>', projectColor: 'red; background:url(x)', metadata: null }),
+    { state: 'idle', unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
+  assert.deepEqual(mydeskInfo(null), { state: 'idle', unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
+});
+
+test("a change in MyDesk's record alone (looked at: unreviewed off) is a change of cast, and md(id) reads it", async () => {
+  const changes = [];
+  let body = [agent({ id: 's1', sessionId: 's1', status: 'completed', unreviewed: true })];
+  const m = createMyDesk({ dataDir: tmp(), env: { OFFICE_MYDESK_URL: 'http://127.0.0.1:3000' }, everyMs: 0, fetchImpl: async () => reply(body)(), onChange: (c) => changes.push(c) });
+  await m.poll();
+  assert.equal(m.md('s1').unreviewed, true);
+  body = [agent({ id: 's1', sessionId: 's1', status: 'completed', unreviewed: false })];
+  await m.poll();
+  assert.equal(changes.length, 2);
+  assert.equal(m.md('s1').unreviewed, false);
+  assert.equal(m.md('nobody'), null);
+  assert.equal(m.md(undefined), null);
+  assert.equal(createMyDesk({ dataDir: tmp(), env: {}, everyMs: 0 }).md('s1'), null, 'not linked: no record');
+});
+
+test('applyMydesk: true only when the record on a session changes; null takes it off', () => {
+  const s = {};
+  const md = mydeskInfo({ status: 'error' });
+  assert.equal(applyMydesk(s, md), true);
+  assert.equal(applyMydesk(s, { ...md }), false, 'the same again: nothing to send');
+  assert.equal(applyMydesk(s, { ...md, state: 'working' }), true);
+  assert.equal(applyMydesk(s, null), true);
+  assert.equal(s.md, null);
+  assert.equal(applyMydesk(s, null), false);
 });

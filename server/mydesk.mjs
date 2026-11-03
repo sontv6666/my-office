@@ -29,8 +29,36 @@ export function agentTag(providerId) {
   return p;
 }
 
-/** /api/agents -> who is in: { claude: Set(sessionId), external: [{ id, name, cwd, status, agent, tool }] } — external holds
-    every agent's record (agent '' for Claude Code), the stand-in when the office has no session of its own. Subagents are left out. */
+/** What MyDesk knows of an agent beyond the office's three statuses, kept with its record (`md`):
+    - state: MyDesk's own status (working, thinking, waiting, help, completed, error, idle): an error is not a rest;
+    - unreviewed: it finished and you have not looked at it in MyDesk yet;
+    - parentId: the session it works for (MyDesk's metadata.parentId), or null;
+    - toolWarning: the tool it is running cannot be undone (MyDesk's irreversible-tool check);
+    - projectColor: MyDesk's colour for its project ('#rrggbb'), or null. */
+export function mydeskInfo(a) {
+  const st = String(a?.status || '');
+  const color = String(a?.projectColor || '');
+  return {
+    state: /^[a-z_]{1,24}$/.test(st) ? st : 'idle',
+    unreviewed: !!a?.unreviewed,
+    parentId: a?.metadata?.parentId ? String(a.metadata.parentId) : null,
+    toolWarning: !!a?.toolWarning,
+    projectColor: /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null,
+  };
+}
+
+/** Lay MyDesk's record (`md`, mydeskInfo()) on one of the office's sessions -> true when it changed (the page is told
+    again then). null takes it off (MyDesk gone, or it no longer lists that session). */
+export function applyMydesk(s, md) {
+  const next = md ? { ...md } : null;
+  if (JSON.stringify(s.md ?? null) === JSON.stringify(next)) return false;
+  s.md = next;
+  return true;
+}
+
+/** /api/agents -> who is in: { claude: Set(sessionId), external: [{ id, name, cwd, status, agent, tool, md }] } — external holds
+    every agent's record (agent '' for Claude Code), the stand-in when the office has no session of its own; md is
+    mydeskInfo(). Subagents are left out. */
 export function castOf(list) {
   const claude = new Set(), external = [];
   for (const a of Array.isArray(list) ? list : []) {
@@ -41,7 +69,7 @@ export function castOf(list) {
     if (!tag) claude.add(id);
     external.push({
       id, name: String(a.name || tag || 'claude'), cwd: String(a.metadata?.projectPath || ''), status: officeStatus(a.status), agent: tag,
-      tool: a.currentTool ? String(a.currentTool) : '',
+      tool: a.currentTool ? String(a.currentTool) : '', md: mydeskInfo(a),
     });
   }
   return { claude, external };
@@ -51,8 +79,12 @@ const sameCast = (a, b) => !!a && !!b && a.claude.size === b.claude.size && [...
   && JSON.stringify(a.external) === JSON.stringify(b.external);
 
 /**
- * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env }) -> { link(url), allows(sid), cast(), status(), poll() }.
+ * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env }) -> { link(url), allows(sid), cast(), status(), poll(), md(id) }.
  * cast() is null while not linked (or MyDesk is gone): then every session is allowed.
+ * md(agentId) is MyDesk's record of that agent (mydeskInfo()), null when it has none. The server lays it on its sessions
+ * when the cast changes and sends it to the page with each session:
+ *   syncCast():  for (const s of sessions.values()) if (applyMydesk(s, mydesk.md(agentIdOf(s)))) broadcast({ k: 'sess', s: pub(s) });
+ *   pub(s):      md: s.md || null
  */
 export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, env = process.env, everyMs = 2000 } = {}) {
   const FILE = path.join(dataDir, 'mydesk.json');
@@ -103,6 +135,7 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
     poll,
     allows: (sid) => !cast || (!!sid && cast.claude.has(sid)),
     cast: () => cast,
+    md: (id) => (cast && id && cast.external.find((x) => x.id === id)?.md) || null,
     status: () => ({ url, linked: !!cast, sessions: cast ? cast.external.length : null }),
   };
 }
