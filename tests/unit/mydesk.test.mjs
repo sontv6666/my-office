@@ -11,7 +11,7 @@ const reply = (body, status = 200) => async () => ({ ok: status < 400, status, j
 
 test('MyDesk statuses map to the office three', () => {
   assert.deepEqual(['working', 'thinking', 'waiting', 'help', 'idle', 'done', 'error', 'completed'].map(officeStatus),
-    ['work', 'work', 'wait', 'wait', 'rest', 'rest', 'rest', 'rest']);
+    ['work', 'work', 'rest', 'wait', 'rest', 'rest', 'rest', 'rest']);   // waiting = turn over, your next prompt: not an approval
 });
 
 test('provider ids become the tags the page knows; Claude Code is the default', () => {

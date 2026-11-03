@@ -14,9 +14,11 @@ import path from 'node:path';
 const FAILS_TO_UNLINK = 3;
 
 /** MyDesk's status -> the office's three. */
+// (MyDesk's 'waiting' is a turn that ended — the CLI waits for your NEXT prompt, nothing to approve: it rests here.
+// Only 'help' — a permission prompt or a question — is the office's 'wait', "needs your approval".)
 export function officeStatus(status) {
   if (status === 'working' || status === 'thinking') return 'work';
-  if (status === 'waiting' || status === 'help') return 'wait';
+  if (status === 'help') return 'wait';
   return 'rest';
 }
 
