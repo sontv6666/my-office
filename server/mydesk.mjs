@@ -90,7 +90,11 @@ export function boardFor(raw, officeIdOf = () => null) {
     claimedBy: t.claimedBy ? officeIdOf(String(t.claimedBy)) || null : null,
   }));
   const projects = (Array.isArray(raw.projects) ? raw.projects : []).slice(0, 100).filter((p) => p && p.id != null).map((p) => ({ id: str(p.id, 64), name: str(p.name, 80) }));
-  return { tasks, projects, doneTotal: Number.isFinite(raw.doneTotal) ? raw.doneTotal : tasks.filter((t) => t.status === 'done').length };
+  // handoffs MyDesk sent (task events handoff_sent, kept by createMyDesk().board()): to = the receiving session here
+  const handoffs = (Array.isArray(raw.handoffs) ? raw.handoffs : []).slice(-20)
+    .map((h) => ({ seq: Number(h && h.seq), taskId: str(h && h.taskId, 64), to: h && h.sessionId ? officeIdOf(String(h.sessionId)) || null : null }))
+    .filter((h) => Number.isFinite(h.seq) && h.to);
+  return { tasks, projects, doneTotal: Number.isFinite(raw.doneTotal) ? raw.doneTotal : tasks.filter((t) => t.status === 'done').length, handoffs };
 }
 
 /**
@@ -145,11 +149,23 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
 
   /** MyDesk's Projects board, read when an office page asks (every few seconds while one is open): null when not
       linked, MyDesk gone, or its projects not ready. */
+  // (the feed's events after a cursor: the first read takes none — a cold start never replays — then each read the
+  // new ones; handoffs are kept, the last 20, with their seq, so every page sees each once whatever its timing)
+  let boardCursor = null;
+  const handoffs = [];
   async function board() {
     if (!url || !cast) return null;
     try {
-      const r = await fetchImpl(`${url}/api/v2/office/board`, { signal: AbortSignal.timeout(1500) });
-      return r.ok ? await r.json() : null;
+      const q = boardCursor === null ? '' : `?since=${encodeURIComponent(boardCursor)}`;
+      const r = await fetchImpl(`${url}/api/v2/office/board${q}`, { signal: AbortSignal.timeout(1500) });
+      if (!r.ok) return null;
+      const raw = await r.json();
+      if (raw && raw.cursor != null) boardCursor = raw.cursor;
+      for (const e of (raw && Array.isArray(raw.events) ? raw.events : [])) {
+        if (e && e.type === 'handoff_sent' && e.payload && e.payload.sessionId) handoffs.push({ seq: e.seq, taskId: e.taskId, sessionId: e.payload.sessionId });
+      }
+      handoffs.splice(0, Math.max(0, handoffs.length - 20));
+      return raw && typeof raw === 'object' ? { ...raw, handoffs: handoffs.slice() } : raw;
     } catch { return null; }
   }
 

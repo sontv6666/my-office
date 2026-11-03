@@ -47,3 +47,14 @@ test('statuses it does not know are to do; blocked shows with doing', () => {
   assert.equal(columnOf('blocked'), 'doing');
   assert.equal(columnOf('done'), 'done');
 });
+
+test('handoffsToFly: a page\'s first look flies nothing; then each new handoff once, in order', async () => {
+  const { handoffsToFly } = await import('../../src/shared/task-board.js');
+  const list = [{ seq: 5, taskId: 't', to: 'a' }, { seq: 7, taskId: 'u', to: 'b' }];
+  const first = handoffsToFly(list, null);
+  assert.deepEqual(first, { fly: [], seen: 7 });
+  const more = handoffsToFly([...list, { seq: 9, taskId: 'v', to: 'c' }, { seq: 8, taskId: 'w', to: 'd' }], first.seen);
+  assert.deepEqual(more.fly.map((h) => h.seq), [8, 9]);
+  assert.equal(more.seen, 9);
+  assert.deepEqual(handoffsToFly(undefined, 9), { fly: [], seen: 9 });
+});

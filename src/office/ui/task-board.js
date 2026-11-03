@@ -12,7 +12,8 @@ import { DESKS, dLocal } from '../world/desks.js';
 import { sessions, workers } from '../people/workers.js';
 import { addProp } from '../interact/props.js';
 import { toast } from './activity.js';
-import { taskBoard } from '../../shared/task-board.js';
+import { handoffsToFly, taskBoard } from '../../shared/task-board.js';
+import { flyEnvelope } from '../people/envelopes.js';
 import { t as tr } from '../../i18n/index.js';
 
 const CW = 1024, CH = 512, W = 2.6, H = (W * CH) / CW;
@@ -131,11 +132,22 @@ function build() {
 }
 
 /** A board from the server (or a test): built the first time there is one; redrawn when it changes. */
+let seenHandoff = null;   // the highest handoff seq this page has shown (null: none looked at yet)
+const _from = new THREE.Vector3();
 export function showTasks(raw) {
   const b = taskBoard(raw, atDesk);
   if (!b) return false;
   data = b; lastRaw = raw;
   if (!group) build();
+  // a MyDesk handoff: a brief flies from this board to the desk of the session that got it
+  const h = handoffsToFly(raw && raw.handoffs, seenHandoff);
+  seenHandoff = h.seen;
+  for (const x of h.fly.slice(0, 4)) {
+    const w = workers.get(x.to);
+    if (!w || !w.root.visible) continue;
+    group.getWorldPosition(_from);
+    flyEnvelope({ x: _from.x, y: _from.y, z: _from.z }, { x: w.pos.x, y: 1.3 + w.gy(), z: w.pos.y }, 'handoff');
+  }
   const key = JSON.stringify([state.streamer, b.todo, b.doing, b.review, b.doneTotal, b.pinned.map((p) => [p.task.id, p.task.title, p.sessionId, sessions.get(p.sessionId)?.desk])]);
   if (key !== sig) { sig = key; drawBoard(b); syncDeskNotes(b); }
   return true;

@@ -47,5 +47,29 @@ test('board(): read only while linked; MyDesk not ready or gone is null', async 
   answer = { status: 503, body: { error: 'projects store is not ready' } };
   assert.equal(await md.board(), null);
   answer = { status: 200, body: RAW };
-  assert.deepEqual(await md.board(), RAW);
+  assert.deepEqual(await md.board(), { ...RAW, handoffs: [] });   // (+ the handoffs it has kept: none on a first read)
+});
+
+test('handoffs: the first read replays nothing; later handoff_sent events are kept with the receiving office session', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-handoff-'));
+  const urls = [];
+  let events = [];
+  const fetchImpl = async (u) => {
+    urls.push(String(u));
+    if (String(u).endsWith('/api/agents')) return new Response(JSON.stringify([{ id: 'sid-a', name: 'a', status: 'working' }]), { status: 200 });
+    return new Response(JSON.stringify({ tasks: [], projects: [], doneTotal: 0, cursor: 50 + events.length, events }), { status: 200 });
+  };
+  const md = createMyDesk({ dataDir: dir, fetchImpl, env: {}, everyMs: 0 });
+  md.link('http://127.0.0.1:3000');
+  await md.poll();
+  events = [{ seq: 41, type: 'claimed', taskId: 't1', payload: {} }];
+  const first = await md.board();
+  assert.ok(!urls.at(-1).includes('since='), 'a first look asks for no history');
+  assert.deepEqual(first.handoffs, []);
+  events = [{ seq: 51, type: 'handoff_sent', taskId: 't1', payload: { sessionId: 'sid-a', via: 'hook' } }];
+  const next = await md.board();
+  assert.ok(urls.at(-1).endsWith('?since=51'), 'then only what is new');
+  const b = boardFor(next, (sid) => (sid === 'sid-a' ? 'office-a' : null));
+  assert.deepEqual(b.handoffs, [{ seq: 51, taskId: 't1', to: 'office-a' }]);
+  assert.deepEqual(boardFor(next, () => null).handoffs, [], 'a receiver not on the floor flies nothing');
 });
