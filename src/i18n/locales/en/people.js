@@ -80,12 +80,8 @@ export default {
   },
   poke: {
     doneNamed: 'Finished “{done}”, let me rest a bit 😴',
-    done: 'All done, let me rest a bit 😴',
     resting: 'Been resting {ago}… ping me if you need me 💤',
-    boss: "Out of work, boss! Give me a new task and I'm up 😪",
-    charging: 'Zzz… all done, recharging 🔋',
-    wrappedNamed: '“{done}” is wrapped up, quick break first 😌',
-    wrapped: 'Just a quick break, back at it soon 😌',
+    turn: 'Last turn: {line}',
   },
   // reactions to what you do (people/errands.js): a lamp switched the wrong way (off after dark, on by day), a page you
   // printed, a coffee you made, the cat on someone's keyboard, a click on someone at work. One line picked at random.

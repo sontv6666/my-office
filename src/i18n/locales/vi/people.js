@@ -73,12 +73,8 @@ export default {
   },
   poke: {
     doneNamed: 'Xong “{done}” rồi mà, cho em nghỉ tí 😴',
-    done: 'Xong việc rồi mà, cho em nghỉ tí 😴',
     resting: 'Em nghỉ được {ago} rồi… có việc thì nhắn em nha 💤',
-    boss: 'Hết việc rồi sếp ơi, giao việc mới là em dậy liền 😪',
-    charging: 'Zzz… làm xong hết rồi, đang sạc pin 🔋',
-    wrappedNamed: '“{done}” xong xuôi rồi, nghỉ chút đã 😌',
-    wrapped: 'Nghỉ xíu thôi, lát làm tiếp nha 😌',
+    turn: 'Lượt vừa rồi: {line}',
   },
   lamp: {
     off: ['Ơ, tôi đang làm mà! 😤', 'Ai tắt đèn thế? Tối om rồi!', 'Tối thế này sao mà code 😩'],

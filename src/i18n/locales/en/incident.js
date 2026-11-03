@@ -10,8 +10,8 @@ export default {
   againFail: 'Not again! {text}',
   // a worker reporting a finished turn to the director
   report: 'Report: done with “{task}”',
-  reportHidden: 'Report: task done',
-  reportNoTask: 'Report: all done',
+  // a finished turn told with its numbers (life/finish.js): "done · 12 min · 5 file edits"
+  finish: { done: 'done', report: 'Report: done', edits: { one: '{n} file edit', other: '{n} file edits' } },
   reportLeft: "Left it on the director's desk",
   turn: {
     done: '{name} is done',

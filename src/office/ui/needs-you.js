@@ -45,7 +45,7 @@ export function noteStatus(s, prev, { fx = false, viaEvent = false } = {}) {
   dirty = true;
   const w = workers.get(s.id); if (!w) return;
   // answered (or gone back to rest): the "waiting for you" bubble goes with it (else the hand lowering says it again)
-  if (prev === 'wait' && s.status !== 'wait' && w.lastSay?.kind === 'wait') { w.hush(); w.lastSay = null; }
+  if (prev === 'wait' && s.status !== 'wait' && (w.lastSay?.kind === 'wait' || w.lastSay?.type === 'wait' || w.lastSay?.type === 'ask')) { w.hush(); w.lastSay = null; }
   if (s.status !== 'wait' || prev === 'wait') return;
   if (!viaEvent) {
     w.push({ ...ACT.wait, type: 'wait', text: s.last?.label ? `${tr('activity.doing.wait')} · ${s.last.label}` : tr('activity.doing.wait') });

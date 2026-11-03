@@ -34,7 +34,7 @@ export default {
     wait: 'waiting for your approval: {label}',
     fail: 'error: {label}',
     stopNamed: 'done: “{label}”',
-    stop: 'done, off to make coffee',
+    stop: 'turn done',
     interrupt: 'stopped midway (you pressed Esc)',
     idle: 'waiting for your message',
     deploy: 'deploy {label} 🚀',

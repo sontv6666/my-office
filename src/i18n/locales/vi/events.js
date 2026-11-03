@@ -27,7 +27,7 @@ export default {
     wait: 'chờ bạn duyệt: {label}',
     fail: 'lỗi: {label}',
     stopNamed: 'xong: “{label}”',
-    stop: 'xong việc, đi pha cà phê',
+    stop: 'xong lượt',
     interrupt: 'dừng giữa chừng (bạn đã bấm Esc)',
     idle: 'đang chờ bạn nhắn',
     deploy: 'deploy {label} 🚀',

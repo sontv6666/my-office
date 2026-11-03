@@ -17,6 +17,7 @@ import { DESK_SPOTS, DOOR_IN, DOOR_OUT, NODES, STATIONS, allocate, faceTo, neare
 import { COFFEE_Q, hideMeal, joinCoffee, leaveCoffee, showMeal } from './breaks.js';
 import { blocked, fp } from '../interact/first-person.js';
 import { sfx } from '../audio/sfx.js';
+import { finishLine, lastFinish } from '../life/finish.js';
 import { t as tr } from '../../i18n/index.js';
 
 /* ---------- workers ---------- */
@@ -267,7 +268,8 @@ export function setup() {
     push(a) { this.want = a; }
     apply(a) {
       this.anim = a.anim; this.phase = 'idle';
-      this.say(a.type || 'other', a.text, a.kind || ''); if (a.e) this.lastSay.e = a.e;
+      if (a.silent) { this.hush(); this.lastSay = null; }   // (a quiet end: nothing to say)
+      else { this.say(a.type || 'other', a.text, a.kind || ''); if (a.e) this.lastSay.e = a.e; }
       this.dwellUntil = state.sim + (a.dwell ?? 1.4);
       this.restAt = a.rest ? state.sim + a.rest : Infinity;
       if (a.after) a.after();
@@ -299,7 +301,11 @@ export function setup() {
       if (this.queued) return;
       if (this.onBreak) return;   // out of Claude (life/quota.js): on a break until the limit resets
       if (this.dailyLife(s) || this.nightOut(s)) return;
-      if (this.anim === 'hand' && s.status !== 'wait') { this.anim = ANIM_AT[this.station] || 'idle'; if (this.lastSay) this.say(this.lastSay.type, this.lastSay.text); }
+      if (this.anim === 'hand' && s.status !== 'wait') {   // answered: the hand comes down, and "waiting for you" goes with it
+        this.anim = ANIM_AT[this.station] || 'idle';
+        if (this.lastSay && this.lastSay.type !== 'wait' && this.lastSay.type !== 'ask') this.say(this.lastSay.type, this.lastSay.text);
+        else if (this.lastSay) { this.hush(); this.lastSay = null; }
+      }
       if (s.status === 'rest' && this.anim !== 'sleep' && state.sim > this.restAt) this.goHomeAndRest();
       if (s.status === 'rest' && this.restAt === Infinity && this.anim !== 'sleep' && this.anim !== 'coffee' && state.sim > this.dwellUntil + 20) this.goHomeAndRest();
     }
@@ -328,13 +334,9 @@ export function setup() {
       const s = sessions.get(this.id); if (!s) return;
       const done = state.streamer ? '' : short(s.lastPrompt || '', 34), ago = fmtAgo(Math.max(60, (nowMs() - (s.doneAt || s.lastAt || nowMs())) / 1000));
       const P = (key, vars) => tr(`people.poke.${key}`, vars);
-      const lines = [
-        done ? P('doneNamed', { done }) : P('done'),
-        P('resting', { ago }),
-        P('boss'),
-        P('charging'),
-        done ? P('wrappedNamed', { done }) : P('wrapped'),
-      ];
+      // what it finished, how long it has rested, its last long turn's numbers (life/finish.js): nothing made up
+      const fin = lastFinish(this.id);
+      const lines = [done ? P('doneNamed', { done }) : '', P('resting', { ago }), fin ? P('turn', { line: finishLine(fin, '') }) : ''].filter(Boolean);
       this.pokeN = ((this.pokeN ?? randInt(0, lines.length - 1)) + 1) % lines.length;
       this.say('idle', lines[this.pokeN], 'rest');
       this.waveUntil = state.sim + (reduceMotion ? 0 : 1.3); this.pokeHushAt = state.sim + 4.5;
@@ -392,7 +394,8 @@ export function setup() {
       sfx.play('pop');
       if (this.rousedN >= 4) { this.say('idle', R('ignore'), 'rest'); this.pokeHushAt = state.sim + 3.5; return true; }
       const done = state.streamer ? '' : short(s.lastPrompt || '', 34), ago = fmtAgo(Math.max(60, (nowMs() - (s.doneAt || s.lastAt || nowMs())) / 1000));
-      const first = [R('hi'), done ? tr('people.poke.doneNamed', { done }) : tr('people.poke.done'), tr('people.poke.resting', { ago }), tr('people.poke.boss'), tr('people.poke.charging')];
+      const fin = lastFinish(this.id);
+      const first = [R('hi'), done ? tr('people.poke.doneNamed', { done }) : '', tr('people.poke.resting', { ago }), fin ? tr('people.poke.turn', { line: finishLine(fin, '') }) : ''].filter(Boolean);
       const text = this.rousedN === 1 ? first[randInt(0, first.length - 1)] : R(this.rousedN === 2 ? 'again' : 'last');
       this.errand({ type: 'idle', anim: 'wake', wait: 0, hold: 1.6, anim2: 'idle', linger: 3.2, line: R('stir'),
         at: () => { this.waveUntil = state.sim + 1.3; return text; },

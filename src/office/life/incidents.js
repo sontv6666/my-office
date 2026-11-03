@@ -24,6 +24,7 @@ import { headache, treat } from '../people/outings.js';
 import { pickleCi, pickleTest } from '../people/pickle.js';
 import { photoRelease } from '../people/photobooth.js';
 import { noteEvent } from '../ui/needs-you.js';
+import { finishLine, takeFinish } from './finish.js';
 
 /* ---------- incidents: three failures in five minutes turn the office red for a while ---------- */
 export const fails = [];
@@ -42,7 +43,9 @@ export function updateIncident(t) {
 export function onEvent(e) {
   chatEvent(e);   // (the group chat: ui/group-chat.js)
   noteEvent(e);   // (a failed turn, a finished one: what stays at the desk, ui/needs-you.js)
-  if (e.type === 'stop' || e.type === 'commit') printPage();   // every finished turn and every commit prints a page
+  // a finished turn (shared/finish.js): marked only after a minute or more of real work, with its numbers
+  const fin = e.type === 'stop' && !e.agent ? takeFinish(e.sess) : null;
+  if ((fin && fin.celebrate) || e.type === 'commit') printPage();   // a real finish and every commit print a page
   if (e.type === 'test' || e.type === 'testok' || e.type === 'testfail') { onTest(e); if (!e.agent) pickleTest(e); }   // the test board's lamps (tests.js); a point on the pickleball court (people/pickle.js)
   if (e.type === 'commit') onCommit(e); if (e.type === 'push') onPush(e);   // a letter in the post box; the postman (post.js)
   if (e.type === 'push' || e.type === 'deploy') applaud(e.sess);
@@ -78,9 +81,11 @@ export function onEvent(e) {
   }
   if (e.type === 'prompt') a.after = () => { state.boardPulse = { id: e.sess, until: state.sim + 2.6 }; state.boardDirty = true; };
   if (director && e.type === 'prompt') director.deliver(e.sess, e.label || '');
-  if (director && e.type === 'stop' && director.station === 'home' && STATIONS.director.some((x) => !x.by)) {   // pro plan: report to the director first, then the pantry
-    const rest = a, done = s.lastPrompt || e.label || '';
-    a = { station: 'director', anim: 'think', type: 'stop', text: !done ? tr('incident.reportNoTask') : state.streamer ? tr('incident.reportHidden') : tr('incident.report', { task: short(done, 40) }), e, dwell: 2.4,
+  if (fin && !fin.celebrate) a = { station: 'desk', anim: 'think', type: 'stop', silent: true, e, dwell: 1, rest: 2 };   // a short turn: back to the desk, quietly
+  else if (fin) a.text = finishLine(fin);
+  if (director && fin?.celebrate && director.station === 'home' && STATIONS.director.some((x) => !x.by)) {   // pro plan: report to the director first, then the pantry
+    const rest = a, done = state.streamer ? '' : s.lastPrompt || '';
+    a = { station: 'director', anim: 'think', type: 'stop', text: finishLine(fin, done ? tr('incident.report', { task: short(done, 28) }) : tr('incident.finish.report')), e, dwell: 2.4,
       after: () => { if (!director.ack(w)) w.say('stop', tr('incident.reportLeft')); w.push(rest); } };
   }
   if (e.type === 'deploy') { launchRocket(); toast(tr('incident.deployed', { name: dn(s), label: e.label })); }

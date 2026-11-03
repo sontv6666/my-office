@@ -13,6 +13,7 @@ import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, s
 import { queueUi } from '../ui/activity.js';
 import { closeSession } from '../ui/session-drawer.js';
 import { noteGone, noteStatus } from '../ui/needs-you.js';
+import { forgetTurn, noteTurn } from '../life/finish.js';
 import { t as tr } from '../../i18n/index.js';
 
 export let TOKEN;
@@ -144,6 +145,8 @@ export function upsertSession(s, walkIn = true, e = null) {
     w.setAcct(s.acct);
     w.setStuck(s.stuck);
   }
+  // the turn's busy time and edits, for an honest finish (life/finish.js)
+  noteTurn(s, prev, { e, live: walkIn && prev !== undefined && state.connectedOnce });
   // waiting for you, failed, done and not looked at (ui/needs-you.js): a live change raises the hand, sounds, pans
   noteStatus(s, prev, { fx: walkIn && prev !== undefined && state.connectedOnce, viaEvent: !!e && !e.agent && (e.type === 'wait' || e.type === 'ask') });
   queueUi();
@@ -158,7 +161,7 @@ export function removeSession(id) {
   }
   if (s && s.desk >= 0) chairs[s.desk].color.set(CHAIR_IDLE);
   if (state.selectedId === id) closeSession();
-  noteGone();
+  noteGone(); forgetTurn(id);
   queueUi();
 }
 
