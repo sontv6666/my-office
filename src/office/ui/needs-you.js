@@ -20,6 +20,7 @@ import { notifyWait } from './topbar.js';
 import { sfx } from '../audio/sfx.js';
 import { fp } from '../interact/first-person.js';
 import { attentionOf, nextMemory } from '../../shared/attention.js';
+import { placeEdgeChips } from '../../shared/spread.js';
 import { t as tr } from '../../i18n/index.js';
 
 const AMBER = new THREE.Color('#F2B33D');
@@ -155,22 +156,37 @@ function placeChips(now) {
   if (now - chipsAt < 150) return;
   chipsAt = now;
   const W = edgeEl.clientWidth, H = edgeEl.clientHeight, pad = 46;
+  const want = [];   // chips to show: where they point, before keeping them apart
   for (const [id, c] of chips) {
     const w = workers.get(id);
-    let css = '';
     if (w && w.root.visible && !fp.on && !state.photo && W && H) {
       _v.set(w.pos.x, 1.0 + w.gy(), w.pos.y).project(camera);
       if (Math.abs(_v.x) > 0.94 || Math.abs(_v.y) > 0.9) {
         const dx = _v.x, dy = -_v.y, k = 1 / Math.max(Math.abs(dx), Math.abs(dy), 1e-6);
-        const x = W / 2 + dx * k * (W / 2 - pad), y = H / 2 + dy * k * (H / 2 - pad);
-        css = `${Math.round(x)},${Math.round(y)},${Math.round((Math.atan2(dy * H, dx * W) * 180) / Math.PI)}`;
         const label = short(dn(sessions.get(id)) || '', 18);
-        if (c.name.textContent !== label) { c.name.textContent = label; c.b.title = tr('activity.needsYou.show', { name: label }); }
+        if (c.name.textContent !== label) { c.name.textContent = label; c.b.title = tr('activity.needsYou.show', { name: label }); c.w = 0; }
+        want.push({ id, x: W / 2 + dx * k * (W / 2 - pad), y: H / 2 + dy * k * (H / 2 - pad), w: c.w || 150, h: c.h || 28,
+          a: Math.round((Math.atan2(dy * H, dx * W) * 180) / Math.PI) });
       }
     }
+  }
+  // never over the camera toolbar, never on top of each other (shared/spread.js)
+  let pos = new Map();
+  if (want.length) {
+    const host = edgeEl.getBoundingClientRect();
+    const avoid = [...document.querySelectorAll('.toolbar')].map((b) => b.getBoundingClientRect()).filter((r) => r.width && r.height)
+      .map((r) => ({ x: r.left - host.left, y: r.top - host.top, w: r.width, h: r.height }));
+    pos = placeEdgeChips(want, W, H, { avoid });
+  }
+  for (const [id, c] of chips) {
+    const p = pos.get(id), a = p ? want.find((x) => x.id === id).a : 0;
+    const css = p ? `${p.x},${p.y},${a}` : '';
     if (css === c.css) continue;
     c.css = css; c.b.hidden = !css;
-    if (css) { const [x, y, a] = css.split(','); c.b.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; c.arrow.style.transform = `rotate(${a}deg)`; }
+    if (css) {
+      c.b.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`; c.arrow.style.transform = `rotate(${a}deg)`;
+      if (!c.w) { c.w = c.b.offsetWidth; c.h = c.b.offsetHeight; }   // its real size, for the next pass
+    }
   }
 }
 export function updateNeedsYou(t) {

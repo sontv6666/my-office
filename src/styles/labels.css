@@ -27,7 +27,7 @@
 .is-stream .tag-acct { filter: blur(3px); }
 .tag-team { margin-left: 2px; padding: 2px 7px; border-radius: 999px; background: rgba(106, 174, 255, .18); color: #A9CCFF; font-size: 10px; font-weight: 700; }
 .tag { transition: margin-top .2s ease-out, opacity .2s; }
-.bubble { transition: opacity .2s, margin-bottom .2s ease-out; }
+.bubble { transition: opacity .2s, margin-bottom .2s ease-out, translate .25s ease-out; }
 .bubble--wait .b-ico { background: var(--amber-soft); color: var(--amber); }
 .bubble--fail { border-color: var(--red); }
 .bubble--fail .b-ico { background: var(--red-soft); color: var(--red); }

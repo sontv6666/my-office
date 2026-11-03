@@ -49,6 +49,7 @@ import { THEME } from '../world/backdrops/index.js';
 import { drawFrame, onQualityChange, phoneLike, quality, stepDown } from '../scene/quality.js';
 import { toast } from '../ui/activity.js';
 import { t as tr } from '../../i18n/index.js';
+import { spreadBubbles } from '../ui/bubble-spread.js';
 
 export let focusTarget;
 const clock = new THREE.Clock();
@@ -203,6 +204,7 @@ export function loop(now = 0) {
   drawFrame(camera); if (PERF) lap('draw');
   clipFrame();
   labels.render(scene, camera);
+  spreadBubbles();
   placePlc(); if (PERF) lap('labels');
 }
 
