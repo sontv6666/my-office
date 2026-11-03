@@ -77,3 +77,22 @@
 .ny-edge[hidden] { display: none; }
 .ny-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
 .ny-arrow { width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--amber); }
+
+/* The task board up close (ui/task-board-sheet.js) */
+.tbs-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(8, 12, 18, .45); }
+.tbs { width: min(1040px, 94vw); max-height: 82vh; overflow: auto; background: var(--panel, #fff); color: var(--text, #14181f); border-radius: 16px; padding: 18px 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); font: 14px/1.4 var(--font); }
+.tbs-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.tbs-h { margin: 0; font-size: 18px; }
+.tbs-sub { color: var(--muted, #5d6675); font-size: 12.5px; }
+.tbs-close { margin-left: auto; border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; padding: 2px 6px; border-radius: 8px; }
+.tbs-close:hover, .tbs-close:focus-visible { background: rgba(127, 127, 127, .15); outline: none; }
+.tbs-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tbs-col { background: rgba(127, 127, 127, .08); border-radius: 12px; padding: 10px; min-width: 0; }
+.tbs-ch { margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.tbs-col--review .tbs-ch { color: #0f9488; } .tbs-col--doing .tbs-ch { color: #2563eb; } .tbs-col--done .tbs-ch { color: #16a34a; }
+.tbs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tbs-task { background: var(--panel, #fff); border: 1px solid rgba(127, 127, 127, .2); border-radius: 8px; padding: 7px 9px; display: grid; gap: 2px; }
+.tbs-title { font-weight: 600; overflow-wrap: anywhere; }
+.tbs-meta, .tbs-empty, .tbs-foot, .tbs-none { color: var(--muted, #5d6675); font-size: 12px; }
+.tbs-foot { margin: 12px 0 0; }
+@media (max-width: 760px) { .tbs-cols { grid-template-columns: 1fr 1fr; } }

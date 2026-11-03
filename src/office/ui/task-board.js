@@ -12,7 +12,7 @@ import { put, rbox, toonMat } from '../scene/blocks.js';
 import { DESKS, dLocal } from '../world/desks.js';
 import { sessions, workers } from '../people/workers.js';
 import { addProp } from '../interact/props.js';
-import { toast } from './activity.js';
+import { openTaskSheet } from './task-board-sheet.js';
 import { handoffsToFly, taskBoard } from '../../shared/task-board.js';
 import { flyEnvelope } from '../people/envelopes.js';
 import { movesNow, setMoveHooks, shownTasks, takeMoves } from './task-moves.js';
@@ -130,7 +130,7 @@ function build() {
   const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), toonMat({ map: tex, roughness: 0.8, emissive: '#FFFFFF', emissiveMap: tex, emissiveIntensity: 0.5 }));
   face.rotation.y = Math.PI / 2; face.position.x = 0.036; group.add(face);
   group.updateMatrixWorld(true);
-  prop = addProp('tasks', { name: tr('board.tasks.name'), hint: '', meshes: [...group.children], act: () => { if (data) toast(summary(data), 6000); } });
+  prop = addProp('tasks', { name: tr('board.tasks.name'), hint: '', meshes: [...group.children], act: () => { if (data) openTaskSheet(data, (lastRaw && lastRaw.projects) || []); } });
 }
 
 /** A board from the server (or a test): built the first time there is one; redrawn when it changes. A new read
@@ -172,7 +172,7 @@ export function setup() {
   if (!PRO && !HQ) return;   // (the small office has no wall free for it)
   document.fonts?.ready.then(() => { sig = ''; if (lastRaw) showTasks(lastRaw, false); });   // (drawn again in the office's own font)
   setMoveHooks({ redraw: () => { if (lastRaw) showTasks(lastRaw, false); }, boardAt: () => (group ? { x: AT[0], z: AT[2] } : null) });
-  if (new URLSearchParams(location.search).has('debug') && window.__office) Object.assign(window.__office, { showTasks, taskMoves: movesNow });   // (screenshots, tests)
+  if (new URLSearchParams(location.search).has('debug') && window.__office) Object.assign(window.__office, { showTasks, taskMoves: movesNow, openTasks: () => data && openTaskSheet(data, (lastRaw && lastRaw.projects) || []) });   // (screenshots, tests)
   if (STATIC || new URLSearchParams(location.search).has('demo')) return;   // (the demo has no MyDesk)
   timer = setTimeout(poll, 3000);
 }

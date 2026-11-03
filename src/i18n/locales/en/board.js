@@ -37,6 +37,8 @@ export default {
     todo: 'To do', doing: 'Doing', review: 'Review', done: 'Done',
     atDesks: '{n} pinned at desks', none: 'No open tasks',
     hint: '{todo} to do · {doing} doing · {review} in review · {done} done',
+    close: 'Close', emptySheet: 'No tasks yet — make them in MyDesk › Projects.',
+    foot: 'Tasks and their stages are managed in MyDesk › Projects.',
   },
   // the to-dos the demo starts with
   demo: {

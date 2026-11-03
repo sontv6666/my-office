@@ -91,6 +91,7 @@ import * as interactPlaceCards from './interact/place-cards.js';
 import * as uiWhiteboard from './ui/whiteboard.js';
 import * as uiNeedsBoard from './ui/needs-board.js';
 import * as uiTaskBoard from './ui/task-board.js';
+import * as uiTaskSheet from './ui/task-board-sheet.js';
 import * as uiLookSwitch from './ui/look-switch.js';
 import * as uiSettings from './ui/settings.js';
 import * as uiWrapped from './ui/wrapped.js';
@@ -208,6 +209,7 @@ const MODULES = [
   uiWhiteboard,
   uiNeedsBoard,
   uiTaskBoard,
+  uiTaskSheet,
   uiLookSwitch,
   uiSettings,
   uiWrapped,
