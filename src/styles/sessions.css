@@ -46,7 +46,7 @@
 .av:has(.av-logo) { box-shadow: inset 0 0 0 2.5px var(--c), inset 0 0 0 4px rgba(0, 0, 0, .25); }
 .av-st { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 2.5px var(--side); }
 .ri[data-status="work"] .av-st { background: var(--green); }
-.ri[data-status="work"] .av::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green); opacity: 0; animation: ring 2.2s ease-out infinite; }
+.ri[data-status="work"] .av::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green); opacity: .55; }   /* (a still ring: one endless ring per working session kept the page repainting while idle) */
 .ri[data-status="wait"] .av-st { background: var(--amber); }
 .ri[data-status="rest"] .av { opacity: .62; }
 @keyframes ring { 0% { transform: scale(.9); opacity: .55; } 100% { transform: scale(1.18); opacity: 0; } }
@@ -115,7 +115,7 @@
 .hl-tip svg { width: 13px; height: 13px; color: var(--amber); margin-top: 1px; }
 .act-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .live-tag { display: inline-flex; align-items: center; gap: 6px; font-size: .7rem; color: var(--muted); }
-.live-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: blink 1.6s ease-in-out infinite; }
+.live-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }   /* (still: an endless blink cost a third of a core with nothing happening) */
 @keyframes blink { 50% { opacity: .3; } }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.75fr); gap: 6px; margin: 0 16px 10px; }
 .kpi { display: grid; justify-items: start; gap: 2px; padding: 8px 8px 7px; border-radius: 11px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
