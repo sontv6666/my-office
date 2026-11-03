@@ -23,11 +23,11 @@ export function taskBoard(board, atDesk = () => false) {
   return out;
 }
 
-/** Handoffs a page has not shown yet: seen = the highest seq it has seen (null on its first look — then nothing flies,
+/** Handoffs a page has not shown yet: seen = the highest seq it has seen (null on its first look — then nothing flies (and with none yet, 0),
     the past is not replayed). -> { fly: [{ seq, taskId, to }], seen } */
 export function handoffsToFly(handoffs, seen) {
   const list = Array.isArray(handoffs) ? handoffs.filter((h) => h && Number.isFinite(h.seq) && h.to) : [];
   const top = list.reduce((m, h) => Math.max(m, h.seq), seen ?? -Infinity);
-  if (seen === null || seen === undefined) return { fly: [], seen: Number.isFinite(top) ? top : null };
+  if (seen === null || seen === undefined) return { fly: [], seen: Number.isFinite(top) ? top : 0 };   // (none yet: every one after is new)
   return { fly: list.filter((h) => h.seq > seen).sort((a, b) => a.seq - b.seq), seen: top };
 }

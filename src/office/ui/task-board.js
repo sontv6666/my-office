@@ -2,7 +2,8 @@
 // task in progress pinned as a note at the desk of whoever claimed it (src/shared/task-board.js decides which).
 // Read from the office server (/api/mydesk/board, a read of MyDesk's own office board endpoint) every 5 s while the
 // page is seen; while MyDesk has no board (not linked, its projects not set up) nothing is built and it asks every
-// 30 s. Nothing here moves: a board and notes redrawn only when the tasks change.
+// 30 s. Nothing here moves: a board and notes redrawn only when the tasks change. A claim, a review or a done that the
+// claimant can act out (resting, not working) is carried by hand between the board and their desk (ui/task-moves.js).
 import * as THREE from 'three';
 import { HQ, PRO, STATIC } from '../core/env.js';
 import { state } from '../core/state.js';
@@ -14,6 +15,7 @@ import { addProp } from '../interact/props.js';
 import { toast } from './activity.js';
 import { handoffsToFly, taskBoard } from '../../shared/task-board.js';
 import { flyEnvelope } from '../people/envelopes.js';
+import { movesNow, setMoveHooks, shownTasks, takeMoves } from './task-moves.js';
 import { t as tr } from '../../i18n/index.js';
 
 const CW = 1024, CH = 512, W = 2.6, H = (W * CH) / CW;
@@ -131,18 +133,23 @@ function build() {
   prop = addProp('tasks', { name: tr('board.tasks.name'), hint: '', meshes: [...group.children], act: () => { if (data) toast(summary(data), 6000); } });
 }
 
-/** A board from the server (or a test): built the first time there is one; redrawn when it changes. */
+/** A board from the server (or a test): built the first time there is one; redrawn when it changes. A new read
+    (fresh) also starts the task moves it brings (ui/task-moves.js): a task under way is drawn where it was, or not at
+    all while it is carried, until it is put down. */
 let seenHandoff = null;   // the highest handoff seq this page has shown (null: none looked at yet)
+let shownById = new Map();   // the tasks of the last read, by id (a move's "before")
 const _from = new THREE.Vector3();
-export function showTasks(raw) {
-  const b = taskBoard(raw, atDesk);
-  if (!b) return false;
-  data = b; lastRaw = raw;
+export function showTasks(raw, fresh = true) {
+  if (!taskBoard(raw)) return false;
   if (!group) build();
+  if (fresh) takeMoves(raw, shownById);
+  const b = taskBoard({ ...raw, tasks: shownTasks(raw.tasks) }, atDesk);
+  data = b; lastRaw = raw;
+  if (fresh) shownById = new Map(raw.tasks.filter((t) => t && t.id).map((t) => [t.id, t]));
   // a MyDesk handoff: a brief flies from this board to the desk of the session that got it
   const h = handoffsToFly(raw && raw.handoffs, seenHandoff);
   seenHandoff = h.seen;
-  for (const x of h.fly.slice(0, 4)) {
+  for (const x of fresh ? h.fly.slice(0, 4) : []) {
     const w = workers.get(x.to);
     if (!w || !w.root.visible) continue;
     group.getWorldPosition(_from);
@@ -163,8 +170,9 @@ async function poll() {
 
 export function setup() {
   if (!PRO && !HQ) return;   // (the small office has no wall free for it)
-  document.fonts?.ready.then(() => { sig = ''; if (lastRaw) showTasks(lastRaw); });   // (drawn again in the office's own font)
-  if (new URLSearchParams(location.search).has('debug') && window.__office) window.__office.showTasks = showTasks;   // (screenshots, tests)
+  document.fonts?.ready.then(() => { sig = ''; if (lastRaw) showTasks(lastRaw, false); });   // (drawn again in the office's own font)
+  setMoveHooks({ redraw: () => { if (lastRaw) showTasks(lastRaw, false); }, boardAt: () => (group ? { x: AT[0], z: AT[2] } : null) });
+  if (new URLSearchParams(location.search).has('debug') && window.__office) Object.assign(window.__office, { showTasks, taskMoves: movesNow });   // (screenshots, tests)
   if (STATIC || new URLSearchParams(location.search).has('demo')) return;   // (the demo has no MyDesk)
   timer = setTimeout(poll, 3000);
 }

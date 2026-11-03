@@ -57,4 +57,7 @@ test('handoffsToFly: a page\'s first look flies nothing; then each new handoff o
   assert.deepEqual(more.fly.map((h) => h.seq), [8, 9]);
   assert.equal(more.seen, 9);
   assert.deepEqual(handoffsToFly(undefined, 9), { fly: [], seen: 9 });
+  const none = handoffsToFly([], null);
+  assert.equal(none.seen, 0, 'a first look with none yet: the first handoff after it is new');
+  assert.deepEqual(handoffsToFly([{ seq: 3, taskId: 't', to: 'a' }], none.seen).fly.map((h) => h.seq), [3]);
 });

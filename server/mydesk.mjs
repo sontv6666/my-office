@@ -79,8 +79,9 @@ const sameCast = (a, b) => !!a && !!b && a.claude.size === b.claude.size && [...
   && JSON.stringify(a.external) === JSON.stringify(b.external);
 
 /** MyDesk's Projects board (GET <url>/api/v2/office/board) -> what the office wall shows, or null when it is not one:
-    { tasks: [{ id, title, status, priority, projectId, claimedBy }], projects: [{ id, name }], doneTotal }.
-    claimedBy becomes the office's own session id by officeIdOf(MyDesk's session id) (null: not on the floor). */
+    { tasks: [{ id, title, status, priority, projectId, claimedBy }], projects: [{ id, name }], doneTotal,
+    handoffs: [{ seq, taskId, to }], moves: [{ seq, taskId, kind, from, title, to }] }.
+    claimedBy (and a handoff's or a move's `to`) becomes the office's own session id by officeIdOf(MyDesk's session id) (null: not on the floor). */
 export function boardFor(raw, officeIdOf = () => null) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tasks)) return null;
   const str = (v, n) => String(v ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, n);
@@ -94,7 +95,44 @@ export function boardFor(raw, officeIdOf = () => null) {
   const handoffs = (Array.isArray(raw.handoffs) ? raw.handoffs : []).slice(-20)
     .map((h) => ({ seq: Number(h && h.seq), taskId: str(h && h.taskId, 64), to: h && h.sessionId ? officeIdOf(String(h.sessionId)) || null : null }))
     .filter((h) => Number.isFinite(h.seq) && h.to);
-  return { tasks, projects, doneTotal: Number.isFinite(raw.doneTotal) ? raw.doneTotal : tasks.filter((t) => t.status === 'done').length, handoffs };
+  // task moves for the floor to act out (taskMove(), kept by createMyDesk().board()): to = the claimant here
+  const moves = (Array.isArray(raw.moves) ? raw.moves : []).slice(-20)
+    .map((m) => ({
+      seq: Number(m && m.seq), taskId: str(m && m.taskId, 64), kind: m && MOVE_KINDS.has(m.kind) ? m.kind : '',
+      from: /^[a-z_]{1,24}$/.test(String(m && m.from)) ? String(m.from) : null, title: str(m && m.title, 160),
+      to: m && m.sessionId ? officeIdOf(String(m.sessionId)) || null : null,
+    }))
+    .filter((m) => Number.isFinite(m.seq) && m.taskId && m.kind && m.to);
+  return { tasks, projects, doneTotal: Number.isFinite(raw.doneTotal) ? raw.doneTotal : tasks.filter((t) => t.status === 'done').length, handoffs, moves };
+}
+
+const MOVE_KINDS = new Set(['claim', 'review', 'done']);
+/** One event of MyDesk's board feed -> a task move for the floor, or null: { seq, taskId, kind ('claim' | 'review' |
+    'done'), sessionId (MyDesk's: the claimant), from (the status before) }. `known` is what earlier reads saw, and is
+    kept up to date here: claimants (task -> session), statuses (task -> status), froms (task -> status before its last
+    change). A claim is MyDesk's `claimed` (its status change to in progress comes just before it); review and done are
+    status changes of a task someone claimed (the agent itself, or the claimant on record when you mark it done). */
+export function taskMove(e, known = { claimants: new Map(), statuses: new Map(), froms: new Map() }) {
+  const id = e && e.taskId != null ? String(e.taskId) : '', p = (e && e.payload) || {};
+  if (!id || !Number.isFinite(e.seq)) return null;
+  const agent = e.actor && e.actor.type === 'agent' && e.actor.id ? String(e.actor.id) : null;
+  if (e.type === 'status_changed') {
+    const was = known.statuses.get(id) ?? (p.from == null ? null : String(p.from));
+    if (p.to != null) known.statuses.set(id, String(p.to));
+    known.froms.set(id, p.from == null ? was : String(p.from));
+    if (p.to !== 'review' && p.to !== 'done') return null;
+    const who = known.claimants.get(id) || agent;
+    return who ? { seq: e.seq, taskId: id, kind: p.to, sessionId: who, from: p.from == null ? was : String(p.from) } : null;
+  }
+  if (e.type === 'claimed') {
+    const who = p.sessionId ? String(p.sessionId) : agent;
+    if (!who) return null;
+    known.claimants.set(id, who);
+    const now = known.statuses.get(id);
+    const from = now === 'in_progress' ? known.froms.get(id) ?? null : now ?? null;
+    return { seq: e.seq, taskId: id, kind: 'claim', sessionId: who, from };
+  }
+  return null;
 }
 
 /**
@@ -152,7 +190,8 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
   // (the feed's events after a cursor: the first read takes none — a cold start never replays — then each read the
   // new ones; handoffs are kept, the last 20, with their seq, so every page sees each once whatever its timing)
   let boardCursor = null;
-  const handoffs = [];
+  const handoffs = [], moves = [], titles = new Map();
+  const known = { claimants: new Map(), statuses: new Map(), froms: new Map() }, { claimants, statuses } = known;
   async function board() {
     if (!url || !cast) return null;
     try {
@@ -161,11 +200,23 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
       if (!r.ok) return null;
       const raw = await r.json();
       if (raw && raw.cursor != null) boardCursor = raw.cursor;
+      const tasks = raw && Array.isArray(raw.tasks) ? raw.tasks.filter((t) => t && t.id != null) : [];
+      for (const t of tasks) if (t.title) titles.set(String(t.id), String(t.title));
       for (const e of (raw && Array.isArray(raw.events) ? raw.events : [])) {
-        if (e && e.type === 'handoff_sent' && e.payload && e.payload.sessionId) handoffs.push({ seq: e.seq, taskId: e.taskId, sessionId: e.payload.sessionId });
+        if (!e || !Number.isFinite(e.seq)) continue;
+        if (e.type === 'handoff_sent' && e.payload && e.payload.sessionId) handoffs.push({ seq: e.seq, taskId: e.taskId, sessionId: e.payload.sessionId });
+        const move = taskMove(e, known);
+        if (move) moves.push({ ...move, title: titles.get(String(e.taskId)) || '' });
       }
       handoffs.splice(0, Math.max(0, handoffs.length - 20));
-      return raw && typeof raw === 'object' ? { ...raw, handoffs: handoffs.slice() } : raw;
+      moves.splice(0, Math.max(0, moves.length - 20));
+      // what the next events are read against: who holds each task, and its status (a move's `from`)
+      for (const t of tasks) {
+        if (t.claimedBy) claimants.set(String(t.id), String(t.claimedBy));
+        statuses.set(String(t.id), String(t.status));
+      }
+      for (const m of [claimants, titles, statuses, known.froms]) while (m.size > 600) m.delete(m.keys().next().value);
+      return raw && typeof raw === 'object' ? { ...raw, handoffs: handoffs.slice(), moves: moves.slice() } : raw;
     } catch { return null; }
   }
 
