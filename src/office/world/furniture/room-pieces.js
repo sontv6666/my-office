@@ -74,8 +74,8 @@ export function setup() {
     g.fillStyle = '#FFFADD'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.fillText('BAND 8.0', 128, 297);
   });
   if (!PRO) {
-    put(scene, rbox(0.06, 1.66, 1.36, '#3B2C20', 0.02), -7.95, 2.45, 4.3);
-    put(scene, new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.5), toonMat({ map: posterTex, roughness: 0.9 })), -7.91, 2.45, 4.3).rotation.y = Math.PI / 2;
+    put(scene, rbox(0.06, 1.66, 1.36, '#3B2C20', 0.02), -7.95, 2.45, LAY.poster);   // (the "Needs you" board hangs between it and the door)
+    put(scene, new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.5), toonMat({ map: posterTex, roughness: 0.9 })), -7.91, 2.45, LAY.poster).rotation.y = Math.PI / 2;
     /* shelf with plants above the door */
     put(scene, rbox(0.34, 0.05, 1.5, woodMid, 0.02), -7.82, 3.05, 1.5);
     potPlant(-7.82, 1.1, 0.35, 'bush', 3.08); potPlant(-7.82, 1.9, 0.35, 'snake', 3.08);

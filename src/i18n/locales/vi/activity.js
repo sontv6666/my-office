@@ -25,7 +25,7 @@ export default {
     stuck: { repeat: 'Kẹt: “{label}” lỗi mãi', compact: 'Kẹt: nén bộ nhớ liên tục', cost: 'Tiêu tiền mà chưa sửa gì' },
   },
   needsYou: { show: '{name} cần bạn: xem' },
-  needsBoard: { title: 'Cần bạn', none: 'Chưa ai cần bạn', wait: 'chờ bạn duyệt', review: 'xong, chưa xem', hint: '{n} người cần bạn: bấm để tới người đầu tiên' },
+  needsBoard: { title: 'Cần bạn', none: 'Chưa ai cần bạn', wait: 'chờ duyệt quyền', review: 'xong, chưa xem', hint: '{n} người cần bạn: bấm để tới người đầu tiên' },
   group: {
     wait: 'Cần bạn duyệt',
     work: 'Đang làm',

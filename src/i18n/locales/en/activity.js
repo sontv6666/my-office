@@ -28,7 +28,7 @@ export default {
   // the chip at the stage's edge for someone waiting out of view (ui/needs-you.js)
   needsYou: { show: '{name} needs you: show' },
   // the board on the wall (ui/needs-board.js): who waits for your approval, who finished and is not read yet
-  needsBoard: { title: 'Needs you', none: 'Nobody needs you right now', wait: 'waiting for you', review: 'done, not read', hint: { one: '1 needs you: click to go there', other: '{n} need you: click to go to the first' } },
+  needsBoard: { title: 'Needs you', none: 'Nobody needs you right now', wait: 'waiting for approval', review: 'finished — not looked at', hint: { one: '1 needs you: click to go there', other: '{n} need you: click to go to the first' } },
   // the session list's groups
   group: {
     wait: 'Needs your approval',

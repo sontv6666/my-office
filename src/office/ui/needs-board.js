@@ -1,9 +1,10 @@
 // "Cần bạn / Needs you": a board listing who waits for your approval or an answer, and who finished a turn you have
 // not looked at yet (ui/needs-you.js decides who holds what; src/shared/needs-board.js orders them). The 3D counterpart
-// of MyDesk's 2D board. On the company floor it stands on the low wall by the lobby's glass doors, turned and tilted
-// back toward the default camera so it reads at the default zoom: a big count, and the first three names. In the small
-// office it hangs by the door.
-// Still when nobody is on it (a grey 0); while somebody is, its amber frame breathes slowly, nothing else moves.
+// of MyDesk's 2D board. Flush on a wall that faces the default camera, as the whiteboard and the task board are: on the
+// company floor on the dev floor's side of the lobby's low wall, between the server room's glass and the glass doors;
+// in the small office on the left wall, between the door and the framed poster. It reads at the default zoom: a big
+// count, and the first three names.
+// Still and dimmed when nobody is on it (a grey 0); while somebody is, its amber frame breathes slowly, nothing else moves.
 // A click: the camera goes to the one waiting longest (as the edge chips do), or opens the first unread finish.
 import * as THREE from 'three';
 import { state } from '../core/state.js';
@@ -21,11 +22,13 @@ import { fp } from '../interact/first-person.js';
 import { boardGlow, needsBoard } from '../../shared/needs-board.js';
 import { t as tr } from '../../i18n/index.js';
 
-const CW = 640, CH = 440;   // the face's canvas in pixels (its size in metres: LAY.needs, width; height to match)
-let W = 2.0, H = 1.375;
+const CW = 640, CH = 520;   // the face's canvas in pixels (its size in metres: LAY.needs, width; height to match)
+const PAD = 28, HEAD = 92, COL = 196, RH = 118;   // padding, the header band, the count's column, a row of the list
+let W = 1.9, H = (W * CH) / CW;
 const FB = '"Be Vietnam Pro", system-ui, sans-serif';
 const AMBER = '#E0912A';
 let group, face, glow, canvas, tex, prop = null;
+const LIT = 0.35, DIM = 0.12;   // the face's own light: lit while somebody is on it, dimmed at 0
 const ROWS = 3;
 let board = needsBoard([], ROWS), sig = null, checkedAt = -1;
 
@@ -49,36 +52,46 @@ function wrap(g, text, max, n) {
   if (out.length > n) { out.length = n; out[n - 1] = fit(g, `${out[n - 1]}…`, max); }
   return out.map((l) => fit(g, l, max));
 }
+// text at the largest of `sizes` (px) it fits in `max` at, else at the smallest, cut; sets g.font
+function sized(g, text, max, weight, sizes) {
+  for (const px of sizes) { g.font = `${weight} ${px}px ${FB}`; if (g.measureText(text).width <= max) return text; }
+  return fit(g, text, max);
+}
+// The face: a header band with the title; under it the count, big, in its own column, and beside it who (a dot, the
+// name whole when it can be, why in plain words), the list centred on the count; "+N more" under the list.
 function draw() {
   const g = canvas.getContext('2d'), b = board, on = b.count > 0;
   g.fillStyle = '#FBFBF7'; g.fillRect(0, 0, CW, CH);
   // the header: amber while somebody is on the board, grey when nobody is
-  g.fillStyle = on ? AMBER : '#C9CED6'; g.fillRect(0, 0, CW, 96);
-  g.fillStyle = '#FFFFFF'; g.font = `800 56px ${FB}`; g.textBaseline = 'middle';
-  g.fillText(fit(g, tr('activity.needsBoard.title').toUpperCase(), CW - 52), 26, 52);
+  g.fillStyle = on ? AMBER : '#C9CED6'; g.fillRect(0, 0, CW, HEAD);
+  g.fillStyle = '#FFFFFF'; g.textBaseline = 'middle'; g.textAlign = 'left';
+  g.fillText(sized(g, tr('activity.needsBoard.title').toUpperCase(), CW - 2 * PAD, 800, [52, 46, 40]), PAD, HEAD / 2 + 3);
+  const top = HEAD + 24, bottom = CH - 24, mid = (top + bottom) / 2;
   // the count, big: what you read from across the floor
-  const NX = 132;
-  g.fillStyle = on ? AMBER : '#C9CED6'; g.font = `900 ${b.count > 99 ? 120 : b.count > 9 ? 170 : 230}px ${FB}`; g.textAlign = 'center';
-  g.fillText(String(Math.min(999, b.count)), NX, 278); g.textAlign = 'left';
-  g.fillStyle = 'rgba(43,58,85,.12)'; g.fillRect(262, 124, 3, CH - 152);
-  const X = 288, RW = CW - X - 22;
-  if (!on) {   // nobody: one plain line
+  g.fillStyle = on ? AMBER : '#C9CED6'; g.font = `900 ${b.count > 99 ? 100 : b.count > 9 ? 148 : 230}px ${FB}`; g.textAlign = 'center';
+  g.fillText(String(Math.min(999, b.count)), COL / 2 + 2, mid + 10); g.textAlign = 'left';
+  g.fillStyle = 'rgba(43,58,85,.12)'; g.fillRect(COL, top, 3, bottom - top);
+  const X = COL + 26, RW = CW - X - PAD, TX = X + 40, TW = CW - TX - PAD;
+  if (!on) {   // nobody: one plain line, centred on the 0
     g.fillStyle = '#8A93A3'; g.font = `600 34px ${FB}`;
     const ls = wrap(g, tr('activity.needsBoard.none'), RW, 3);
-    ls.forEach((l, i) => g.fillText(l, X, 268 - ((ls.length - 1) * 46) / 2 + i * 46));
+    ls.forEach((l, i) => g.fillText(l, X, mid - ((ls.length - 1) * 46) / 2 + i * 46));
   } else {
+    const more = b.count - b.items.length, n = b.items.length;
+    const block = (n - 1) * RH + 76 + (more > 0 ? 48 : 0), y0 = Math.max(top + 18, mid - block / 2 + 18);   // (y0: the first name's middle; a row's ink starts 18 px above it)
     b.items.forEach((x, i) => {
-      const y = 148 + i * 92, wait = x.attention === 'wait';
-      g.fillStyle = wait ? AMBER : x.color; g.beginPath(); g.arc(X + 16, y, 16, 0, Math.PI * 2); g.fill();
-      if (wait) { g.fillStyle = '#FFFFFF'; g.font = `900 24px ${FB}`; g.textAlign = 'center'; g.fillText('!', X + 16, y + 1); g.textAlign = 'left'; }
-      g.fillStyle = '#22304A'; g.font = `800 38px ${FB}`;
-      g.fillText(state.streamer ? tr('common.session') : fit(g, x.name, RW - 46), X + 46, y);
-      g.fillStyle = '#6B7486'; g.font = `600 25px ${FB}`;
-      g.fillText(fit(g, tr(wait ? 'activity.needsBoard.wait' : 'activity.needsBoard.review'), RW - 46), X + 46, y + 36);
+      const y = y0 + i * RH, wait = x.attention === 'wait';   // y: the name's line; why, 44 px under it
+      g.fillStyle = wait ? AMBER : x.color; g.beginPath(); g.arc(X + 14, y, 14, 0, Math.PI * 2); g.fill();
+      if (wait) { g.fillStyle = '#FFFFFF'; g.font = `900 21px ${FB}`; g.textAlign = 'center'; g.fillText('!', X + 14, y + 1); g.textAlign = 'left'; }
+      g.fillStyle = '#22304A';
+      g.fillText(sized(g, state.streamer ? tr('common.session') : x.name, TW, 800, [36, 33, 30]), TX, y);
+      g.fillStyle = wait ? '#A85F0C' : '#4F5B70';
+      g.fillText(sized(g, tr(wait ? 'activity.needsBoard.wait' : 'activity.needsBoard.review'), TW, 600, [28, 25, 22]), TX, y + 44);
     });
-    if (b.count > b.items.length) { g.fillStyle = '#6B7486'; g.font = `700 26px ${FB}`; g.fillText(tr('board.more', { n: b.count - b.items.length }), X + 46, CH - 22); }
+    if (more > 0) { g.fillStyle = '#6B7486'; g.font = `700 26px ${FB}`; g.fillText(tr('board.more', { n: more }), TX, y0 + (n - 1) * RH + 44 + 52); }
   }
   tex.needsUpdate = true;
+  face.material.emissiveIntensity = on ? LIT : DIM;
   if (prop) prop.hint = !on ? tr('activity.needsBoard.none') : tr('activity.needsBoard.hint', { n: b.count });
 }
 
@@ -107,24 +120,21 @@ function goFirst() {
 
 export function setup() {
   const at = LAY.needs; if (!at) return;
-  const [x, y, z, turn = 0, width = 0, tilt = 0, wallTop = null] = at;
+  const [x, y, z, turn = 0, width = 0] = at;
   W = width || W; H = (W * CH) / CW;
   group = new THREE.Group(); group.position.set(x, y, z); group.rotation.y = turn;
   group.userData.noMerge = true;   // (its face is redrawn and its frame glows: core/optimize.js leaves it as it is)
   scene.add(group);
-  // standing on a low wall: a post from the wall's top up behind the board
-  if (wallTop != null) put(group, rbox(0.07, y - wallTop, 0.07, '#5E6670', 0.01), -0.06, -(y - wallTop) / 2, 0).castShadow = false;
-  const face3 = new THREE.Group(); face3.rotation.z = tilt; group.add(face3);   // (tilted back: its face looks up at the camera)
-  put(face3, rbox(0.06, H + 0.1, W + 0.1, '#5E6670', 0.025), 0, 0, 0).castShadow = false;   // (no shadow worth a draw call)
+  put(group, rbox(0.06, H + 0.1, W + 0.1, '#5E6670', 0.025), 0, 0, 0).castShadow = false;   // (no shadow worth a draw call)
   canvas = Object.assign(document.createElement('canvas'), { width: CW, height: CH });
   tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), toonMat({ map: tex, roughness: 0.5, emissive: '#FFFFFF', emissiveMap: tex, emissiveIntensity: 0.35 }));   // (readable at night too)
-  face.rotation.y = Math.PI / 2; face.position.x = 0.036; face3.add(face);
+  face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), toonMat({ map: tex, roughness: 0.5, emissive: '#FFFFFF', emissiveMap: tex, emissiveIntensity: DIM }));   // (readable at night too)
+  face.rotation.y = Math.PI / 2; face.position.x = 0.036; group.add(face);
   // the frame's glow: an amber border just in front of the frame, round the face; shown only while somebody is on it
   glow = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.14, H + 0.14), new THREE.MeshBasicMaterial({ color: '#F2B33D', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
-  glow.rotation.y = Math.PI / 2; glow.position.x = 0.032; glow.visible = false; face3.add(glow);
+  glow.rotation.y = Math.PI / 2; glow.position.x = 0.032; glow.visible = false; group.add(glow);
   draw();
   document.fonts?.ready.then(() => { sig = null; });   // (drawn again in the office's own font once it has loaded)
   group.updateMatrixWorld(true);
-  prop = addProp('needs', { name: tr('activity.needsBoard.title'), hint: tr('activity.needsBoard.none'), meshes: [...face3.children], act: goFirst });
+  prop = addProp('needs', { name: tr('activity.needsBoard.title'), hint: tr('activity.needsBoard.none'), meshes: [...group.children], act: goFirst });
 }
