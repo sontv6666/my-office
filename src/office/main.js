@@ -4,6 +4,7 @@ import * as coreEnv from './core/env.js';
 import * as uiEventText from './ui/event-text.js';
 import * as uiIcons from './ui/icons.js';
 import * as sceneRenderer from './scene/renderer.js';
+import * as sceneGlRecovery from './scene/gl-recovery.js';
 import * as sceneLights from './scene/lights.js';
 import * as sceneQuality from './scene/quality.js';
 import * as worldTerrace from './world/terrace.js';
@@ -118,6 +119,7 @@ const MODULES = [
   uiEventText,
   uiIcons,
   sceneRenderer,
+  sceneGlRecovery,
   sceneLights,
   sceneQuality,
   worldTerrace,

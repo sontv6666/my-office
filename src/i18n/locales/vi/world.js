@@ -1,6 +1,9 @@
 export default {
   noWebgl: 'Trình duyệt này không bật được WebGL nên không vẽ được văn phòng 3D.',
   softwareGl: 'Trình duyệt đang vẽ 3D không có GPU: văn phòng chạy chế độ nhẹ.',
+  glLost: 'Khung 3D vừa mất đồ hoạ. Đang khôi phục…',
+  glDead: 'Khung 3D mất đồ hoạ và không khôi phục được.',
+  glReload: 'Tải lại trang',
   scene: { city: 'Thành phố', country: 'Đồng quê', beach: 'Biển' },
   cooler: 'CPU {mac}',
   plaque: {

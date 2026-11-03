@@ -3,6 +3,10 @@
 export default {
   noWebgl: "This browser can't turn on WebGL, so the 3D office can't be drawn.",
   softwareGl: 'Your browser is drawing 3D without a GPU, so the office runs in light mode.',
+  // the 3D view lost its graphics context (scene/gl-recovery.js)
+  glLost: 'The 3D view lost its graphics for a moment. Bringing it back…',
+  glDead: 'The 3D view lost its graphics and could not get them back.',
+  glReload: 'Load the page again',
   scene: { city: 'City', country: 'Countryside', beach: 'Beach' },
   // the water cooler's little screen
   cooler: '{Mac} CPU',

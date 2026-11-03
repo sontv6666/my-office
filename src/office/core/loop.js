@@ -50,6 +50,7 @@ import { drawFrame, onQualityChange, phoneLike, quality, stepDown } from '../sce
 import { toast } from '../ui/activity.js';
 import { t as tr } from '../../i18n/index.js';
 import { spreadBubbles } from '../ui/bubble-spread.js';
+import { glDead, glDown } from '../scene/gl-recovery.js';
 
 export let focusTarget;
 const clock = new THREE.Clock();
@@ -130,7 +131,9 @@ let PERF = false, tLast = 0;
 const T = { people: 0, life: 0, street: 0, world: 0, draw: 0, labels: 0 };
 const lap = (k) => { const t = performance.now(); T[k] += t - tLast; tLast = t; };
 export function loop(now = 0) {
+  if (glDead()) return;   // (the WebGL context could not be brought back: no more frames, scene/gl-recovery.js)
   requestAnimationFrame(loop);
+  if (glDown()) return;   // (it is gone for now: drawing waits)
   const g = frameGap(now), gap = lite ? 1000 : quality.fps < 60 ? Math.max(g, 1000 / quality.fps) : g;   // list mode: the office keeps its state, barely draws
   if (now - lastFrame < gap - 2) return;
   if (lastFrame && !fp.on && !state.clip) adaptResolution(now - lastFrame, gap, Math.min(0.1, (now - lastFrame) / 1000));

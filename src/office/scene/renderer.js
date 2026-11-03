@@ -75,6 +75,14 @@ export function setup() {
   composer.addPass(new OutputPass());
   // Image-based light: a bright studio room by day, a dark blue room with a warm ceiling glow by night.
   pmrem = new THREE.PMREMGenerator(renderer);
+  makeEnv();
+  scene.environment = envDay;
+  new ResizeObserver(resize).observe(stage);
+  resize();
+}
+// The two environment maps are drawn on the GPU and kept only there: made at start, and again when the WebGL context
+// was lost and came back (scene/gl-recovery.js), the scene keeping the one (day or night) it had.
+function makeEnv() {
   envDay = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
   envNight = (() => {
     const s = new THREE.Scene();
@@ -85,7 +93,10 @@ export function setup() {
     cool.position.set(0, 2, -5.8); s.add(cool);
     return pmrem.fromScene(s, 0.02).texture;
   })();
-  scene.environment = envDay;
-  new ResizeObserver(resize).observe(stage);
-  resize();
+}
+export function rebuildEnv() {
+  const night = !!scene.environment && scene.environment === envNight;
+  envDay?.dispose(); envNight?.dispose();
+  makeEnv();
+  scene.environment = night ? envNight : envDay;
 }
