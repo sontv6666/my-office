@@ -28,6 +28,12 @@ export default {
   add: 'Thêm',
   saveFailed: 'Không lưu được.',
   saveOffline: 'Không lưu được: mất kết nối tới My Office.',
+  tasks: {
+    title: 'Việc', sub: 'từ Dự án MyDesk', name: 'Bảng việc',
+    todo: 'Cần làm', doing: 'Đang làm', review: 'Chờ duyệt', done: 'Xong',
+    atDesks: '{n} việc ghim trên bàn', none: 'Không có việc nào đang mở',
+    hint: '{todo} cần làm · {doing} đang làm · {review} chờ duyệt · {done} xong',
+  },
   demo: {
     d1: 'Trả lời email khách về bảng giá',
     d2: 'Review PR giỏ hàng',

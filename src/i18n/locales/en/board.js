@@ -31,6 +31,13 @@ export default {
   add: 'Add',
   saveFailed: "Couldn't save.",
   saveOffline: "Couldn't save: lost the connection to My Office.",
+  // MyDesk's Projects tasks on the wall (ui/task-board.js)
+  tasks: {
+    title: 'Tasks', sub: 'from MyDesk Projects', name: 'Task board',
+    todo: 'To do', doing: 'Doing', review: 'Review', done: 'Done',
+    atDesks: '{n} pinned at desks', none: 'No open tasks',
+    hint: '{todo} to do · {doing} doing · {review} in review · {done} done',
+  },
   // the to-dos the demo starts with
   demo: {
     d1: 'Answer the client email about pricing',

@@ -37,7 +37,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { applyMydesk, createMyDesk } from './mydesk.mjs';
+import { applyMydesk, boardFor, createMyDesk } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
@@ -2262,6 +2262,16 @@ const server = http.createServer((req, res) => {
       try { noteActivity(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not JSON */ }
       res.writeHead(204).end();
     });
+    return;
+  }
+  // MyDesk's Projects board for the office wall (ui/task-board.js): its tasks, each claim turned into the office's own
+  // session id; { ok: false } when there is none (not linked, MyDesk gone, its projects not set up). This computer only.
+  if (url.pathname === '/api/mydesk/board' && req.method === 'GET') {
+    if (!isLoopback(req)) { res.writeHead(403).end(); return; }
+    mydesk.board().then((raw) => {
+      const b = boardFor(raw, (id) => (bySid(id) || sessions.get('x' + id))?.id || null);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(b ? { ok: true, ...b } : { ok: false }));
+    }, () => { res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ok":false}'); });
     return;
   }
   // MyDesk links itself (server/mydesk.mjs): from this computer only, like the hooks.

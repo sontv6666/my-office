@@ -99,7 +99,7 @@ export function setup() {
   put(group, rbox(0.06, H + 0.1, W + 0.1, '#5E6670', 0.025), 0, 0, 0).castShadow = false;   // (flat on the wall: no shadow worth a draw call)
   canvas = Object.assign(document.createElement('canvas'), { width: CW, height: CH });
   tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), toonMat({ map: tex, roughness: 0.5 }));
+  face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), toonMat({ map: tex, roughness: 0.5, emissive: '#FFFFFF', emissiveMap: tex, emissiveIntensity: 0.35 }));   // (readable at night too)
   face.rotation.y = Math.PI / 2; face.position.x = 0.036; group.add(face);
   // the frame's glow: an amber border just in front of the frame, round the face; shown only while somebody is on it
   glow = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.12, H + 0.12), new THREE.MeshBasicMaterial({ color: '#F2B33D', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));

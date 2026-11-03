@@ -78,8 +78,24 @@ export function castOf(list) {
 const sameCast = (a, b) => !!a && !!b && a.claude.size === b.claude.size && [...a.claude].every((x) => b.claude.has(x))
   && JSON.stringify(a.external) === JSON.stringify(b.external);
 
+/** MyDesk's Projects board (GET <url>/api/v2/office/board) -> what the office wall shows, or null when it is not one:
+    { tasks: [{ id, title, status, priority, projectId, claimedBy }], projects: [{ id, name }], doneTotal }.
+    claimedBy becomes the office's own session id by officeIdOf(MyDesk's session id) (null: not on the floor). */
+export function boardFor(raw, officeIdOf = () => null) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tasks)) return null;
+  const str = (v, n) => String(v ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, n);
+  const tasks = raw.tasks.slice(0, 300).filter((t) => t && typeof t === 'object' && t.id != null).map((t) => ({
+    id: str(t.id, 64), title: str(t.title, 160), status: /^[a-z_]{1,24}$/.test(String(t.status)) ? String(t.status) : 'backlog',
+    priority: Number.isFinite(t.priority) ? t.priority : null, projectId: t.projectId == null ? null : str(t.projectId, 64),
+    claimedBy: t.claimedBy ? officeIdOf(String(t.claimedBy)) || null : null,
+  }));
+  const projects = (Array.isArray(raw.projects) ? raw.projects : []).slice(0, 100).filter((p) => p && p.id != null).map((p) => ({ id: str(p.id, 64), name: str(p.name, 80) }));
+  return { tasks, projects, doneTotal: Number.isFinite(raw.doneTotal) ? raw.doneTotal : tasks.filter((t) => t.status === 'done').length };
+}
+
 /**
- * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env }) -> { link(url), allows(sid), cast(), status(), poll(), md(id) }.
+ * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env }) -> { link(url), allows(sid), cast(), status(), poll(), md(id), board() }.
+ * board() is MyDesk's Projects board as it sends it (boardFor() makes it the wall's), null when there is none.
  * cast() is null while not linked (or MyDesk is gone): then every session is allowed.
  * md(agentId) is MyDesk's record of that agent (mydeskInfo()), null when it has none. The server lays it on its sessions
  * when the cast changes and sends it to the page with each session:
@@ -127,12 +143,23 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
     return true;
   }
 
+  /** MyDesk's Projects board, read when an office page asks (every few seconds while one is open): null when not
+      linked, MyDesk gone, or its projects not ready. */
+  async function board() {
+    if (!url || !cast) return null;
+    try {
+      const r = await fetchImpl(`${url}/api/v2/office/board`, { signal: AbortSignal.timeout(1500) });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+
   if (everyMs > 0) setInterval(poll, everyMs).unref();
   if (url) poll();
 
   return {
     link,
     poll,
+    board,
     allows: (sid) => !cast || (!!sid && cast.claude.has(sid)),
     cast: () => cast,
     md: (id) => (cast && id && cast.external.find((x) => x.id === id)?.md) || null,
