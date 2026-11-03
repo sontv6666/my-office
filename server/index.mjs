@@ -37,7 +37,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { createMyDesk } from './mydesk.mjs';
+import { applyMydesk, createMyDesk } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
@@ -296,7 +296,7 @@ const pub = (s) => ({ id: s.id, pid: s.pid, agent: s.agent || undefined, name: s
   entry: s.entry || '', moved: s.parked ? { to: acctShown(s.parked.to), at: s.parked.at } : null,
   lastAt: s.lastEventAt || s.createdAt, doneAt: s.doneAt || 0, todos: s.todos || [], lastReply: s.lastReply || '', origin: s.origin || '',
   bg: s.bg ? [...s.bg.values()].slice(0, 6) : [],
-  dayFirst: s.dayFirst || null,
+  dayFirst: s.dayFirst || null, md: s.md || null,
   stuck: s.stuck || null,
   wear: wearOf(s),
   cache: cacheOut(s),
@@ -994,6 +994,8 @@ async function syncCast(cast) {
   for (const [key, s] of sessions) {
     if (s.external ? !cast?.external.some((x) => 'x' + x.id === key && !ownSession(x)) : !mydesk.allows(s.sid)) dropSession(key, s);
   }
+  // MyDesk's own record of each agent (raw status, unreviewed, parent…) rides with the session to the page; gone → cleared.
+  for (const s of sessions.values()) if (applyMydesk(s, mydesk.md(agentIdOf(s)))) broadcast({ k: 'sess', s: pub(s) });
   if (!cast) { held.clear(); await scanSessions(); return; }   // (MyDesk gone: every session again)
   if ([...cast.claude].some((sid) => !bySid(sid))) await scanSessions();
   for (const sid of cast.claude) {
