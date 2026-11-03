@@ -39,6 +39,9 @@ export default {
     hint: '{todo} to do · {doing} doing · {review} in review · {done} done',
     close: 'Close', emptySheet: 'No tasks yet — make them in MyDesk › Projects.',
     foot: 'Click a task to open it in MyDesk › Projects.',
+    // several projects: the wall's header, the sheet's filter
+    projects: { one: '{n} project', other: '{n} projects' }, moreProjects: '+{n}',
+    allProjects: 'All', noProject: 'No project', filter: 'Show the tasks of',
     open: 'Open in MyDesk', openFailed: "Couldn't reach MyDesk to open it.",
   },
   // the to-dos the demo starts with

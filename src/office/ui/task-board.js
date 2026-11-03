@@ -4,6 +4,8 @@
 // page is seen; while MyDesk has no board (not linked, its projects not set up) nothing is built and it asks every
 // 30 s. Nothing here moves: a board and notes redrawn only when the tasks change. A claim, a review or a done that the
 // claimant can act out (resting, not working) is carried by hand between the board and their desk (ui/task-moves.js).
+// With tasks from more than one project the header says how many and which (a colour each, shared/task-projects.js),
+// and every note, here and at a desk, carries its project's colour down its left edge.
 import * as THREE from 'three';
 import { HQ, PRO, STATIC } from '../core/env.js';
 import { state } from '../core/state.js';
@@ -14,6 +16,7 @@ import { sessions, workers } from '../people/workers.js';
 import { addProp } from '../interact/props.js';
 import { openTaskSheet } from './task-board-sheet.js';
 import { handoffsToFly, taskBoard } from '../../shared/task-board.js';
+import { boardProjects, projectColor } from '../../shared/task-projects.js';
 import { flyEnvelope } from '../people/envelopes.js';
 import { movesNow, setMoveHooks, shownTasks, takeMoves } from './task-moves.js';
 import { t as tr } from '../../i18n/index.js';
@@ -43,14 +46,39 @@ function lines(g, text, max, n) {
 const atDesk = (id) => (sessions.get(id)?.desk ?? -1) >= 0 && workers.has(id);
 const hidden = (text) => (state.streamer ? '▒▒▒▒ ▒▒▒ ▒▒▒▒▒' : text);
 
-function drawBoard(b) {
+// the projects with open tasks, when there is more than one (else null: one project needs no tags)
+function projectsOn(b, projects) {
+  const on = boardProjects(b, projects).filter((p) => p.open);
+  return on.length > 1 ? on : null;
+}
+// a task's project colour, as the header shows it
+const colorIn = (multi, t) => { const id = t.projectId != null ? String(t.projectId) : ''; return multi.find((p) => p.id === id)?.color || projectColor(id); };
+// a project's tag on a note: its colour down the note's left edge
+function tag(g, color, x, y, h) { g.fillStyle = color; g.fillRect(x, y, 9, h); }
+
+function drawBoard(b, multi) {
   const g = canvas.getContext('2d');
   g.fillStyle = '#C9A877'; g.fillRect(0, 0, CW, CH);   // cork
   g.fillStyle = 'rgba(0,0,0,.05)'; for (let i = 0; i < 260; i++) g.fillRect((i * 97) % CW, (i * 53) % CH, 3, 3);
   g.fillStyle = '#22304A'; g.textBaseline = 'middle';
   g.font = `800 40px ${FB}`; const title = tr('board.tasks.title').toUpperCase(); g.fillText(title, 28, 40);
   const tw = g.measureText(title).width;
-  g.font = `600 22px ${FB}`; g.fillStyle = '#4A3B28'; g.fillText(fit(g, tr('board.tasks.sub'), CW - tw - 80), 28 + tw + 18, 44);
+  if (!multi) { g.font = `600 22px ${FB}`; g.fillStyle = '#4A3B28'; g.fillText(fit(g, tr('board.tasks.sub'), CW - tw - 80), 28 + tw + 18, 44); }
+  else {   // "3 projects" and which: a dot of each one's colour and its name, as many as fit, then "+N"
+    let x = 28 + tw + 18;
+    g.font = `700 22px ${FB}`; g.fillStyle = '#4A3B28';
+    const head = tr('board.tasks.projects', { n: multi.length }); g.fillText(head, x, 44); x += g.measureText(head).width + 16;
+    g.font = `600 21px ${FB}`;
+    const end = CW - 24, plus = (k) => tr('board.tasks.moreProjects', { n: k });
+    for (let i = 0; i < multi.length; i++) {
+      const p = multi[i], rest = multi.length - i - 1;
+      const room = end - x - 20 - (rest ? g.measureText(plus(rest)).width + 14 : 0);
+      if (room < 60) { g.fillStyle = '#4A3B28'; g.fillText(plus(rest + 1), x, 44); break; }
+      const label = fit(g, hidden(p.name || tr('board.tasks.noProject')), Math.min(room, 170));
+      g.fillStyle = p.color; g.beginPath(); g.arc(x + 7, 44, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#4A3B28'; g.fillText(label, x + 20, 44); x += 20 + g.measureText(label).width + 16;
+    }
+  }
   const cols = [['todo', b.todo], ['doing', b.doing], ['review', b.review]];
   cols.forEach(([k, list], c) => {
     const x = 24 + c * 262;
@@ -62,9 +90,11 @@ function drawBoard(b) {
       const y = 126 + i * 66;
       g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x + 4, y + 4, 240, 56);
       g.fillStyle = NOTE[k]; g.fillRect(x, y, 240, 56);
+      if (multi) tag(g, colorIn(multi, t), x, y, 56);
       g.fillStyle = '#C0392B'; g.beginPath(); g.arc(x + 120, y + 5, 5, 0, Math.PI * 2); g.fill();   // the pin
       g.fillStyle = '#22304A'; g.font = `600 19px ${FB}`;
-      lines(g, hidden(t.title), 222, 2).forEach((l, j) => g.fillText(l, x + 9, y + 20 + j * 22));
+      const ix = multi ? 15 : 9;
+      lines(g, hidden(t.title), 231 - ix, 2).forEach((l, j) => g.fillText(l, x + ix, y + 20 + j * 22));
     });
     const more = list.length - 5;
     g.fillStyle = '#4A3B28'; g.font = `700 19px ${FB}`;
@@ -95,7 +125,7 @@ function noteFor(id) {
   deskNotes.set(id, n);
   return n;
 }
-function syncDeskNotes(b) {
+function syncDeskNotes(b, multi) {
   const want = new Map(), perDesk = new Map();
   for (const p of b.pinned) {
     const d = sessions.get(p.sessionId)?.desk; if (!(d >= 0)) continue;
@@ -104,16 +134,17 @@ function syncDeskNotes(b) {
   }
   for (const [id, n] of deskNotes) if (!want.has(id)) { scene.remove(n.sprite); n.sprite.material.dispose(); n.tex.dispose(); deskNotes.delete(id); }
   for (const [id, w] of want) {
-    const n = noteFor(id), key = `${w.task.title}|${w.d}|${w.k}|${state.streamer}`;
+    const color = multi ? colorIn(multi, w.task) : '', n = noteFor(id), key = `${w.task.title}|${w.d}|${w.k}|${state.streamer}|${color}`;
     if (n.key === key) continue;
     n.key = key;
     const g = n.canvas.getContext('2d');
     g.clearRect(0, 0, 256, 128);
     g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(6, 8, 248, 118);
     g.fillStyle = NOTE.doing; g.fillRect(2, 2, 248, 118);
+    if (color) tag(g, color, 2, 2, 118);
     g.fillStyle = '#C0392B'; g.beginPath(); g.arc(126, 10, 7, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#22304A'; g.font = `700 25px ${FB}`; g.textBaseline = 'middle';
-    lines(g, hidden(w.task.title), 228, 3).forEach((l, j) => g.fillText(l, 14, 38 + j * 30));
+    lines(g, hidden(w.task.title), color ? 220 : 228, 3).forEach((l, j) => g.fillText(l, color ? 20 : 14, 38 + j * 30));
     n.tex.needsUpdate = true;
     const [x, z] = dLocal(DESKS[w.d], -0.55 + w.k * 0.34, 0.3);   // (by the screen, on the side away from the marks of ui/needs-you.js)
     n.sprite.position.set(x, 1.34 + w.k * 0.06, z);
@@ -155,8 +186,9 @@ export function showTasks(raw, fresh = true) {
     group.getWorldPosition(_from);
     flyEnvelope({ x: _from.x, y: _from.y, z: _from.z }, { x: w.pos.x, y: 1.3 + w.gy(), z: w.pos.y }, 'handoff');
   }
-  const key = JSON.stringify([state.streamer, b.todo, b.doing, b.review, b.doneTotal, b.pinned.map((p) => [p.task.id, p.task.title, p.sessionId, sessions.get(p.sessionId)?.desk])]);
-  if (key !== sig) { sig = key; drawBoard(b); syncDeskNotes(b); }
+  const multi = projectsOn(b, raw.projects);
+  const key = JSON.stringify([state.streamer, b.todo, b.doing, b.review, b.doneTotal, b.pinned.map((p) => [p.task.id, p.task.title, p.sessionId, sessions.get(p.sessionId)?.desk]), multi && multi.map((p) => [p.id, p.name])]);
+  if (key !== sig) { sig = key; drawBoard(b, multi); syncDeskNotes(b, multi); }
   return true;
 }
 async function poll() {

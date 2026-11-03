@@ -35,6 +35,8 @@ export default {
     hint: '{todo} cần làm · {doing} đang làm · {review} chờ duyệt · {done} xong',
     close: 'Đóng', emptySheet: 'Chưa có việc nào — tạo trong MyDesk › Projects.',
     foot: 'Bấm vào một việc để mở nó trong MyDesk › Projects.',
+    projects: '{n} dự án', moreProjects: '+{n}',
+    allProjects: 'Tất cả', noProject: 'Không thuộc dự án', filter: 'Xem việc của',
     open: 'Mở trong MyDesk', openFailed: 'Không kết nối được MyDesk để mở.',
   },
   demo: {
