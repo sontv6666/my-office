@@ -132,6 +132,13 @@ export default {
   task: {
     title: 'Giao việc',
     conversations: 'Tiếp tục một cuộc trò chuyện (mang theo ngữ cảnh)',
+    mode: {
+      label: 'Quyền',
+      default: 'Hỏi tôi', auto: 'Tự động', bypassPermissions: 'Bỏ qua kiểm tra',
+      defaultHint: 'Lệnh nào cần duyệt đều chờ bạn.',
+      autoHint: 'Claude tự quyết lệnh an toàn; việc rủi ro vẫn hỏi.',
+      bypassPermissionsHint: 'Chạy mọi thứ không hỏi. Chỉ từ máy này.',
+    },
     newIn: 'Cuộc trò chuyện mới trong thư mục',
     placeholder: 'Việc cần làm… (gõ hoặc bấm 🎤 để nói)',
     mic: 'Nói',

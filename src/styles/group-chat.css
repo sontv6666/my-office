@@ -446,3 +446,9 @@
   .zc .zc-coach-c { padding: 4px 10px; }
   .zc .zc-coach-ai { padding: 2px 6px 2px 0; }
 }
+
+/* 📋 Giao việc: how far the run may go without asking (Claude Code's permission mode) */
+.zc-task-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.zc-task-mode { border: 1px solid var(--zc-line, #dfe3ea); background: transparent; color: inherit; border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.zc-task-mode.is-on { background: var(--zc-blue, #2563eb); border-color: var(--zc-blue, #2563eb); color: #fff; }
+.zc-task-mode-note { display: block; color: var(--zc-grey, #6b7280); font-size: 12px; margin-top: 2px; }

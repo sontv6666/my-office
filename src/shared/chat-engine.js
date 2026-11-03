@@ -92,6 +92,8 @@ export function createChatEngine(ctx) {
    *  'work' | 'wait' | 'done' | 'fail', steps (the latest lines), n (how many), at, end, ask (the approval it waits for) } */
   function workCard(from, work) { const p = who(from); if (!p) return null; return add({ from: p.key, name: p.name, kind: 'work', text: '', work }); }
   function setWork(id, work) { const m = byId(id); if (!m || m.kind !== 'work') return; m.work = { ...m.work, ...work }; update(m); }
+  /** A card's sender becomes `from` (a run's new conversation, once it is someone in the office) -> true when it changed. */
+  function setFrom(id, from) { const m = byId(id); const p = who(from); if (!m || !p || m.from === p.key) return false; m.from = p.key; m.name = p.name; update(m); return true; }
   /** A session stuck in a loop (server/loops.mjs): what repeats, then what you did about it. loop: { kind 'repeat' |
    *  'compact' | 'cost', label, n, blocked, usd, mins, state 'on' | 'stopping' | 'stopped' | 'over', hint 'sent' | 'got' |
    *  'lost' | null, sess (its session), task (a run from the office) } */
@@ -219,5 +221,5 @@ export function createChatEngine(ctx) {
     for (const m of st.msgs) if (m.kind === 'remind' && !m.remind.done && m.remind.at <= ctx.now()) { m.remind.done = true; update(m); system(tr('chat.sys.remindNow', { title: m.remind.title })); }
   }
 
-  return { state: st, who, byId, say, system, send, working, workCard, setWork, loopCard, setLoop, react, vote, rsvp, poll, remind, pin, recall, photo, onEvent, onLeft, onMoved, clock, fresh };
+  return { state: st, who, byId, say, system, send, working, workCard, setWork, setFrom, loopCard, setLoop, react, vote, rsvp, poll, remind, pin, recall, photo, onEvent, onLeft, onMoved, clock, fresh };
 }

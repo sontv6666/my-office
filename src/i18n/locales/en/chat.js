@@ -135,6 +135,13 @@ export default {
     title: 'Give work',
     conversations: 'Carry on a conversation (with its context)',
     newIn: 'A new conversation in the folder',
+    mode: {
+      label: 'Permissions',
+      default: 'Ask me', auto: 'Auto', bypassPermissions: 'Skip checks',
+      defaultHint: 'Every command that needs approval waits for you.',
+      autoHint: 'Claude decides what is safe to run; risky actions still ask.',
+      bypassPermissionsHint: 'Runs everything without asking. Only from this computer.',
+    },
     placeholder: 'What to do… (type, or 🎤 to speak)',
     mic: 'Speak',
     photo: 'Photo',

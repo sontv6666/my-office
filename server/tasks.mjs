@@ -21,13 +21,17 @@ const WATCH_MS = 8000;   // how often background sessions are looked at while on
     the office's switch and settings) or null; onBg(task, what, detail): 'started' | 'fallback' (why) | a phase it moved to
     ('work' | 'wait', what it waits for). printSettings(task): the `--settings` a `-p` run gets (the office told which
     session it is and where its inbox is: server/steer.mjs), or nothing. */
+/** The permission modes a run from the office may start in (Claude Code's --permission-mode choices it uses). */
+export const PERM_MODES = ['auto', 'bypassPermissions', 'acceptEdits', 'default'];
+
 export function createTasks({ dataDir, claude, env, onStart, onStep, onDone, onBg, bg = null, printSettings = null, max = 3, perHour = 12, watchMs = WATCH_MS }) {
   const running = new Map(), recent = [];   // id -> task; when the last ones started (the hourly cap)
   const binds = new Map();   // a background session's short id -> { sid, inbox }, told before its task knew the short id
   const imgDir = path.join(dataDir, 'task-images');
   const pub = (t) => ({ id: t.id, dir: t.dir, text: t.text.slice(0, 200), at: t.at, from: t.from || null, sid: t.sid || null, mode: t.mode, job: t.job || null });
   /** { dir, text, images: [data URLs], from: { sid, name, fork } | null } -> { ok, task } or { ok: false, code } */
-  function start({ dir, text, images = [], from = null, env: extra = null, system = '', stopAfter = false }) {
+  // mode: Claude Code's --permission-mode for the run ('auto' | 'bypassPermissions' | 'acceptEdits' | 'default'; null: its own default)
+  function start({ dir, text, images = [], from = null, env: extra = null, system = '', stopAfter = false, mode = null }) {
     text = String(text || '').trim().slice(0, MAX_TEXT);
     if (!text) return { ok: false, code: 'empty' };
     if (running.size >= max) return { ok: false, code: 'busy' };
@@ -47,7 +51,7 @@ export function createTasks({ dataDir, claude, env, onStart, onStep, onDone, onB
     const prompt = files.length ? `${text}\n\n${files.length > 1 ? 'Attached images' : 'Attached image'} (read ${files.length > 1 ? 'them' : 'it'}):\n${files.join('\n')}` : text;
     const e = { ...env(), ...extra }; for (const k of Object.keys(e)) if (e[k] == null) delete e[k];   // (extra: the conversation's own account; null unsets)
     // (stopAfter: a conversation taken from your editor, stopped once done so the editor takes it up again alone)
-    const t = { id, dir, text, at: now, from, sid: null, result: '', error: '', buf: '', bin, env: e, prompt, system, stopAfter, mode: bg?.want() ? 'bg' : 'print' };
+    const t = { id, dir, text, at: now, from, sid: null, result: '', error: '', buf: '', bin, env: e, prompt, system, stopAfter, mode: bg?.want() ? 'bg' : 'print', perm: PERM_MODES.includes(mode) ? mode : null };
     if (t.mode === 'print' && !runPrint(t)) return { ok: false, code: 'noClaude' };
     running.set(id, t); recent.push(now);
     if (t.mode === 'bg') startBg(t);
@@ -59,7 +63,7 @@ export function createTasks({ dataDir, claude, env, onStart, onStep, onDone, onB
     const { from, system } = t;
     // (from.fork false: carry on that very conversation, one this office started for you, instead of a branch of it)
     const set = printSettings?.(t);
-    const args = ['-p', t.prompt, '--output-format', 'stream-json', '--verbose', ...(from?.sid ? ['--resume', from.sid, ...(from.fork === false ? [] : ['--fork-session'])] : []), ...(system ? ['--append-system-prompt', system] : []), ...(set ? ['--settings', set] : [])];   // (system: a word from the office, outside the conversation)
+    const args = ['-p', t.prompt, '--output-format', 'stream-json', '--verbose', ...(t.perm ? ['--permission-mode', t.perm] : []), ...(from?.sid ? ['--resume', from.sid, ...(from.fork === false ? [] : ['--fork-session'])] : []), ...(system ? ['--append-system-prompt', system] : []), ...(set ? ['--settings', set] : [])];   // (system: a word from the office, outside the conversation)
     let proc;
     try { proc = spawn(t.bin.file, args, { cwd: t.dir, env: t.env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', windowsHide: true }); }
     catch { return false; }
@@ -100,7 +104,7 @@ export function createTasks({ dataDir, claude, env, onStart, onStep, onDone, onB
       // (resting: stopped first, or a second one would be a copy; at work, someone on the Mac: never stopped, a copy it is)
       if (row?.id) { keeps = true; if (row.pid && row.state !== 'working' && row.status !== 'busy') await bg.stop(t.bin.file, row.id, t.env).catch(() => false); }
     }
-    const args = ['--bg', ...(t.from?.sid ? ['--resume', t.from.sid] : []),
+    const args = ['--bg', ...(t.from?.sid ? ['--resume', t.from.sid] : []), ...(t.perm ? ['--permission-mode', t.perm] : []),
       ...(keeps ? [] : ['--settings', bg.settings(), ...(t.system ? ['--append-system-prompt', t.system] : [])]), '--', t.prompt];   // (--: words that start with "-" stay words)
     const r = await bg.run(t.bin.file, args, { cwd: t.dir, env: t.env, timeout: 150_000 });   // (a first start of its service may take a while)
     const got = r.code === 0 && parseBackgrounded(r.out);

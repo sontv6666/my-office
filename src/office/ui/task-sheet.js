@@ -82,16 +82,27 @@ export async function openTaskSheet(host, { to = null, text = '' } = {}) {
   const cam = el('button', 'zc-task-tool'); cam.type = 'button'; cam.title = tr('chat.task.photo'); cam.append(icon('image'), el('span', null, tr('chat.task.photo')));
   cam.addEventListener('click', () => file.click());
   const tools = el('div', 'zc-task-tools'); tools.append(mic, cam, file);
+  // how far it may go without asking you (Claude Code's permission mode), kept on the Mac: auto unless you change it
+  let mode = ['default', 'auto', 'bypassPermissions'].includes(r.mode) ? r.mode : 'auto';
+  const modes = el('div', 'zc-task-modes'); modes.setAttribute('role', 'radiogroup'); modes.setAttribute('aria-label', tr('chat.task.mode.label'));
+  const modeNote = el('small', 'zc-task-mode-note');
+  for (const k of ['default', 'auto', 'bypassPermissions']) {
+    const mb = el('button', 'zc-task-mode', tr(`chat.task.mode.${k}`)); mb.type = 'button'; mb.dataset.mode = k; mb.setAttribute('role', 'radio');
+    mb.addEventListener('click', () => { mode = k; syncMode(); });
+    modes.append(mb);
+  }
+  const syncMode = () => { for (const x of modes.children) { const on = x.dataset.mode === mode; x.classList.toggle('is-on', on); x.setAttribute('aria-checked', String(on)); } modeNote.textContent = tr(`chat.task.mode.${mode}Hint`); };
+  syncMode();
   const go = el('button', 'zc-task-go', tr('chat.task.send')); go.type = 'button';
   const sync = () => { go.disabled = !pick || !field.value.trim(); };
   field.addEventListener('input', sync);
   go.addEventListener('click', async () => {
     stopMic?.(); stopMic = null; go.disabled = true; go.textContent = tr('chat.task.sending');
-    const res = await fetch(`/api/tasks${q()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pick, text: field.value, images: photos, fresh: !!pick.dir }) }).then((x) => x.json()).catch(() => null);
+    const res = await fetch(`/api/tasks${q()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pick, text: field.value, images: photos, fresh: !!pick.dir, mode }) }).then((x) => x.json()).catch(() => null);
     if (res?.ok) { toast(tr('chat.task.started'), 5000); sheet.remove(); sheet = null; return; }
     toast(res?.message || tr('drawer.unreachable'), 6000); go.textContent = tr('chat.task.send'); sync();
   });
-  sheet.append(list, field, thumbs, tools, el('p', 'zc-task-note', tr('chat.task.note')), go);
+  sheet.append(list, field, thumbs, tools, el('small', 'zc-task-h', tr('chat.task.mode.label')), modes, modeNote, el('p', 'zc-task-note', tr('chat.task.note')), go);
   if (r.running.length) sheet.append(el('p', 'zc-task-note', tr('chat.task.running', { n: r.running.length })));
   host.append(sheet);
   sync(); setTimeout(() => field.focus({ preventScroll: true }), 50);

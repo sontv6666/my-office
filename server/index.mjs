@@ -21,7 +21,7 @@ import next from 'next';
 import { buildTimeline } from '../src/shared/timeline.js';
 import { dangerKey } from '../src/shared/danger.js';
 import { createChatEngine, REACTIONS } from '../src/shared/chat-engine.js';
-import { createTasks } from './tasks.mjs';
+import { createTasks, PERM_MODES } from './tasks.mjs';
 import { createBg, bgSettings, printSettings } from './bg-sessions.mjs';
 import { steerable, inboundFrom, isSocket, deliver } from './steer.mjs';
 import { createRewriter } from './rewrite.mjs';
@@ -554,7 +554,7 @@ const tasks = createTasks({
   env: () => { const e = { ...process.env }; if (nowDir) e.CLAUDE_CONFIG_DIR = nowDir; return e; },   // (the account new sessions start on)
   bg: { ...bgRun, want: bgOn, settings: () => bgSettings({ port: PORT, win: WIN, send: SEND }) },
   printSettings: (t) => printSettings({ port: PORT, task: t.id, win: WIN, send: SEND }),   // (a `-p` run tells where its inbox is: server/steer.mjs)
-  onStep: (t, x) => cardStep(t.id, stepOf(x.name, x.input)),
+  onStep: (t, x) => { cardStep(t.id, stepOf(x.name, x.input)); cardOwner(t); },
   onBg: (t, what, detail) => onBgTask(t, what, detail),
   onDone: (t) => {
     if (t.sid) taskSids.add(t.sid);
@@ -591,6 +591,12 @@ const pushOut = (msg) => { if (push.count() && !officeFocused()) push.notify(msg
 const threads = new Map();   // the conversation's own id (or 'dir:' a project) -> { sid: the one carried on, at, running }
 // each run's card in the chat (Claude at work: its steps as they come, then done): task id -> { id, steps, n, at, timer }
 const cards = new Map();
+// A run in a new conversation starts as "Claude"; once its session is someone in the office, the card is theirs
+function cardOwner(t) {
+  const c = cards.get(t.id); if (!c || c.owned || !t.sid) return;
+  const s = bySid(t.sid); if (!s) return;
+  c.owned = true; chat.setFrom(c.id, s.id);
+}
 function cardStep(taskId, step) {
   const c = cards.get(taskId); if (!c) return;
   c.steps.push(step); c.n++; if (c.steps.length > 40) c.steps.shift();
@@ -669,7 +675,7 @@ async function stopBgSession(s) {
   if (slug) e.CLAUDE_CONFIG_DIR = dirOfSlug(slug); else delete e.CLAUDE_CONFIG_DIR;
   return !!bin && bgRun.stop(bin.file, s.jobId, e);
 }
-const tasksOut = (local) => ({ ok: true, allowed: local || !!prefs.get('phoneTasks'), running: tasks.list(), bg: bgOut(),
+const tasksOut = (local) => ({ ok: true, allowed: local || !!prefs.get('phoneTasks'), running: tasks.list(), bg: bgOut(), mode: PERM_MODES.includes(prefs.get('taskMode')) ? prefs.get('taskMode') : 'auto',
   projects: knownDirs.filter((d) => fs.existsSync(d)).map((d) => ({ dir: tilde(d), name: path.basename(d) })),
   sessions: [...sessions.values()].filter((s) => s.sid && s.cwd).map((s) => ({ id: s.id, sid: s.sid, name: s.title || s.name, dir: tilde(s.cwd), status: s.status, cache: cacheOut(s) })) });
 
@@ -717,6 +723,11 @@ async function giveWork(b, who) {
   if (!s && !pdir) return [400, { ok: false, code: 'noDir', message: tr('chat.task.noDir') }];
   const text = String(b?.text || '').trim().slice(0, 4000), images = (Array.isArray(b?.images) ? b.images : []).slice(0, 4).map(String);
   if (!text) return [400, { ok: false, code: 'empty' }];
+  // how far it may go without asking (📋 Giao việc's choice, kept): auto by default; skipping every check only from the Mac itself
+  const asked = PERM_MODES.includes(b?.mode) ? b.mode : null;
+  if (asked) prefs.set('taskMode', asked);
+  let mode = asked || (PERM_MODES.includes(prefs.get('taskMode')) ? prefs.get('taskMode') : 'auto');
+  if (mode === 'bypassPermissions' && who !== 'mac') mode = 'auto';
   const name = s ? s.title || s.name : path.basename(pdir), key = s ? s.sid : `dir:${pdir}`, th = threads.get(key);
   if (th?.running) return [409, { ok: false, code: 'busy', message: tr('chat.task.threadBusy', { name }) }];
   let from;
@@ -737,7 +748,7 @@ async function giveWork(b, who) {
   chat.say('me', `@${name} ${text}`, { now: true, long: true });
   const mine = chat.state.msgs.at(-1);
   for (const img of images) if (/^data:image\/jpeg;base64,/.test(img) && img.length < 500_000) chat.photo(img);
-  const r = tasks.start({ dir: s ? s.cwd : pdir, text, images, from, env: s ? acctEnv(from.acct) : null, system: SHOT_ASK, stopAfter: s?.entry === 'claude-vscode' });   // (one from your editor goes back to it alone)
+  const r = tasks.start({ dir: s ? s.cwd : pdir, text, images, from, env: s ? acctEnv(from.acct) : null, system: SHOT_ASK, stopAfter: s?.entry === 'claude-vscode', mode });   // (one from your editor goes back to it alone)
   if (r.ok) {
     threads.set(key, { sid: from.sid, at: Date.now(), running: true });
     if (s) s.viaOffice = r.task.id;
