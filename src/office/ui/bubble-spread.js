@@ -22,7 +22,9 @@ export function spreadBubbles(now = performance.now()) {
   const rects = [];
   for (const [id, w] of shown) {
     const text = w.bubbleEl.textContent;
-    if (w._bubbleText !== text) { w._bubbleText = text; w._bubbleW = w.bubbleEl.offsetWidth; w._bubbleH = w.bubbleEl.offsetHeight; }
+    // (measured again while it reads 0: a bubble sized while still hidden is 0 wide and would never count as overlapping)
+    if (w._bubbleText !== text || !w._bubbleW) { w._bubbleText = text; w._bubbleW = w.bubbleEl.offsetWidth; w._bubbleH = w.bubbleEl.offsetHeight; }
+    if (!w._bubbleW) continue;
     w.bubbleObj.getWorldPosition(_p).project(camera);
     if (_p.z > 1) continue;   // behind the camera
     const x = (_p.x + 1) / 2 * W, y = (1 - _p.y) / 2 * H;
