@@ -9,7 +9,7 @@
 // lit all night, WinMart+ and Bách Hóa Xanh roll their shutters down at closing time. The signs carry the chains' real
 // logos (public/assets/brands, from Wikimedia Commons: see the README there); the town's own eateries are painted fronts.
 // The cafés, the phone shop and the pharmacy are whole modules of their own (shop-*.js: Highlands, Katinat, Phúc Long,
-// Thế Giới Di Động, Long Châu…). Only the nearest chains (WALK_INS) are rooms; the further ones are their sign and a
+// Cộng, Thế Giới Di Động, Long Châu…). Only the nearest chains (WALK_INS) are rooms; the further ones are their sign and a
 // painted picture of the inside, as the eateries are. All the printing (signs, posters, menus, the QR stand, those
 // pictures) is one canvas; the shops cost a handful of merged meshes, and their people are street-folk.js figures,
 // stepped only when in view. Rebuilt when the city changes.
@@ -30,11 +30,12 @@ import { KATINAT } from './shop-katinat.js';
 import { PHUCLONG } from './shop-phuclong.js';
 import { LONGCHAU } from './shop-longchau.js';
 import { DMX } from './shop-dmx.js';
+import { CONG } from './shop-cong.js';
 import { figure, glassOver } from './shop-paint.js';
 // the shops made whole in a file of their own (their printing, fittings, front and people; and `paint`, how the front looks
 // when it is too far to walk into: paint(g, cx, cy, dark) the whole cell, its sign and the picture under it, or
 // paint(g, x, y, w, h, dark) only the picture, in the front's rect, under the sign its draw() makes): chain key -> that module
-const CUSTOM = { highlands: HIGHLANDS, tgdd: TGDD, katinat: KATINAT, phuclong: PHUCLONG, longchau: LONGCHAU, dmx: DMX };
+const CUSTOM = { highlands: HIGHLANDS, tgdd: TGDD, katinat: KATINAT, phuclong: PHUCLONG, longchau: LONGCHAU, dmx: DMX, cong: CONG };
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || '';
 export const SHOPS = 12, SHOP_W = 6.6, SHOP_CEIL = 2.75;   // how many, a shop's width and its ceiling (metres)
@@ -44,10 +45,14 @@ export const SHOPS = 12, SHOP_W = 6.6, SHOP_CEIL = 2.75;   // how many, a shop's
    none, as the nearest fronts are round the office and only one or two are in sight at a time; the 9th to 12th are the
    ones in the long views, and as rooms they add 11% to the triangles on the pavement (761k against 675k), 3% from the
    office's view, and half again to the street's time each frame (0.6 ms against 0.4; with the CPU slowed 4×, 1.4 against
-   1.2, and the picture's 5.4 ms against 4.8). ?debug&walkins=N tries another number. */
-const WALK_INS = 8;
+   1.2, and the picture's 5.4 ms against 4.8). Ten in Ho Chi Minh City since 2/11/2026 (WALK_INS_AT), so that Bách Hóa
+   Xanh and Điện Máy Xanh could come to the office's door there with every room there was before still a room (not
+   measured again: about half the four's cost, by the numbers above); the other cities keep their eight, so a chain with
+   one shop in town stays painted further down. ?debug&walkins=N tries another number. */
+const WALK_INS = 8, WALK_INS_AT = { hcm: 10 };
 export const shopDepth = (deep) => Math.min(5.0, deep - 1.4);   // how far in a shop goes, in a building `deep` deep
 const FL = 0.12, GLASS = 2.42, SIGN_H_M = 0.9, DOOR = 0.82;      // the floor (level with the pavement), the glass's top, the sign, half the door
+const FRAME = '#4A515B';   // the glass fronts' frames
 /* what each city has, front-most first (the first WALK_INS chains are the rooms you walk into, so the ones people go to
    come first). Oct 2026: GS25, Circle K, 7-Eleven and Ministop in Ho Chi Minh City; Circle K, GS25 and WinMart+ in Hanoi;
    WinMart+ everywhere; Bách Hóa Xanh in the south; none of the foreign chains confirmed in Đà Nẵng; Mixue everywhere, 4–6
@@ -56,15 +61,20 @@ const FL = 0.12, GLASS = 2.42, SIGN_H_M = 0.9, DOOR = 0.82;      // the floor (l
    Phúc Long's own shops in Ho Chi Minh City, Hanoi, Đà Nẵng, Nha Trang, Đà Lạt, Cần Thơ and Hải Phòng (in Huế only
    inside the mall). Katinat in Ho Chi Minh City (most of its ~93), Hanoi since 2022, Cần Thơ and Đà Lạt. Điện Máy Xanh
    (the same group's appliance chain as Thế Giới Di Động) in every province: in the smaller cities in a front that was to
-   let. 'rent': a shuttered front to let. */
+   let. Cộng Cà Phê (its store list, Nov 2026): 26 in Hà Nội, 21 in Ho Chi Minh City, 4 in Đà Nẵng, 4 in Khánh Hòa (Nha
+   Trang), one each in Hải Phòng, Huế and Đà Lạt, none in Cần Thơ: a room where there are many, further down the street
+   (painted) where there is one; in Hà Nội it takes WinMart+'s room. In Ho Chi Minh City (the
+   office's city until you pick one) Bách Hóa Xanh and Điện Máy Xanh are right by the office, rooms you walk into (asked
+   for, 2/11/2026: neither was in sight, Bách Hóa Xanh not on the street at all), Cộng in Circle K's room (Circle K
+   painted there, GS25 the 24-hour room), and no Ministop. 'rent': a shuttered front to let. */
 const SETS = {
-  hcm: ['gs25', 'mixue', 'highlands', 'tgdd', 'circlek', 'longchau', 'phuclong', 'katinat', 'dmx', 'seven', 'ministop', 'bhx'],
-  hn: ['circlek', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'katinat', 'gs25', 'winmart', 'pho', 'dmx', 'buncha'],
-  hp: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'banhdacua', 'circlek', 'dmx', 'winmart', 'haisan', 'longchau'],
-  dn: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'miquang', 'haisan', 'dmx', 'winmart', 'banhxeo', 'longchau'],
-  hue: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'bunbo', 'comhen', 'dmx', 'winmart', 'banhxeo', 'longchau', 'bunbo'],
-  nt: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'bunchaca', 'haisan', 'dmx', 'winmart', 'banhxeo', 'longchau'],
-  dl: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'katinat', 'banhcan', 'suadau', 'dmx', 'winmart', 'banhxeo'],
+  hcm: ['gs25', 'mixue', 'bhx', 'dmx', 'highlands', 'tgdd', 'cong', 'longchau', 'phuclong', 'katinat', 'circlek', 'seven'],
+  hn: ['circlek', 'mixue', 'highlands', 'cong', 'tgdd', 'longchau', 'phuclong', 'katinat', 'gs25', 'pho', 'dmx', 'buncha'],
+  hp: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'banhdacua', 'circlek', 'dmx', 'cong', 'haisan', 'longchau'],
+  dn: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'miquang', 'haisan', 'dmx', 'cong', 'banhxeo', 'longchau'],
+  hue: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'bunbo', 'comhen', 'dmx', 'winmart', 'banhxeo', 'longchau', 'cong'],
+  nt: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'bunchaca', 'haisan', 'dmx', 'cong', 'banhxeo', 'longchau'],
+  dl: ['winmart', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'katinat', 'banhcan', 'suadau', 'dmx', 'cong', 'banhxeo'],
   ct: ['bhx', 'mixue', 'highlands', 'tgdd', 'longchau', 'phuclong', 'katinat', 'winmart', 'hutieu', 'laumam', 'dmx', 'bhx'],
 };
 /* the chains: logo, the sign (face, stripes), the staff's shirt, opening hours (null: day and night), a window counter to
@@ -85,7 +95,7 @@ const CHAINS = {
   mixue: { name: 'Mixue', parlour: true, face: '#E50914', stripes: ['#E50914'], accent: '#E50914', shirt: '#1E1E1E', hours: [9, 22], seats: true },
   highlands: { ...HIGHLANDS.chain, custom: 'highlands' }, tgdd: { ...TGDD.chain, custom: 'tgdd' },
   katinat: { ...KATINAT.chain, custom: 'katinat' }, phuclong: { ...PHUCLONG.chain, custom: 'phuclong' }, longchau: { ...LONGCHAU.chain, custom: 'longchau' },
-  dmx: { ...DMX.chain, custom: 'dmx' },
+  dmx: { ...DMX.chain, custom: 'dmx' }, cong: { ...CONG.chain, custom: 'cong' },
   bhx: { name: 'Bách Hóa Xanh', logo: 'bach-hoa-xanh.png', face: '#008C44', stripes: ['#FFE600', '#008C44'], accent: '#008C44', shirt: '#0B8A43', hours: [6.5, 21.5], seats: false,
     fridge: { id: 'eggs', price: 30, carry: 'grocery' }, side: { id: 'meat', price: 65, carry: 'grocery', unit: 'meat' }, hot: null },
 };
@@ -491,7 +501,8 @@ export function buildShops(G, fronts) {
   const canvas = document.createElement('canvas'); canvas.width = W * PX; canvas.height = H * PX;
   const g = canvas.getContext('2d'), tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  const qs = new URLSearchParams(location.search), walkIns = qs.has('debug') && qs.get('walkins') ? Number(qs.get('walkins')) : WALK_INS;
+  const qs = new URLSearchParams(location.search), asked = qs.has('debug') && qs.get('walkins') ? Number(qs.get('walkins')) : 0;
+  const walkIns = () => asked || WALK_INS_AT[city] || WALK_INS;
   let city = null, set = [], night = false, built = null, stores = [], shut = [], now = 0;
   const cellOf = (n) => [(n % 2) * CELL, Math.floor(n / 2) * ROW];
   function cell(n) {
@@ -562,9 +573,9 @@ export function buildShops(G, fronts) {
       // (in front of the till, not the window counter; at GS25 the other side, its table is there)
       const kerb = ch?.custom ? CUSTOM[ch.custom].kerb : ch?.parlour ? [2.0, 2.85] : ch && !ch.outdoor ? [1.15, 2.0, 2.85] : [-2.6, -1.75, -0.9, -0.05].slice(0, ch?.outdoor ? 2 : 3 + (n % 2));
       kerb.forEach((x, k) => put(parkedScooter(['#D9534F', '#F2F2F2', '#2E86DE', '#3B3B3B'][(k + n) % 4]).rotateY(0.18 * (k % 2 ? 1 : -1)).translate(x, FL, 1.0), out));
-      const far = !!ch && chains++ >= walkIns;
+      const far = !!ch && chains++ >= walkIns();
       if (!ch || far) {   // an eatery, a front to let, a chain too far off to walk into: painted, in a plain frame
-        put(boxAt(SHOP_W + 0.3, GLASS + 0.05, 0.08, 0, FL + GLASS / 2, 0.03, '#5E6670'), out);
+        put(boxAt(SHOP_W + 0.3, GLASS + 0.05, 0.08, 0, FL + GLASS / 2, 0.03, (ch?.custom && CUSTOM[ch.custom].frame) || '#5E6670'), out);
         put(decal(SHOP_W, GLASS - FL, n, R.front).translate(0, FL + (GLASS - FL) / 2 + 0.02, 0.075), faces);
         if (far) { Object.assign(S, { far, spots: [], seats: [], fix: [] }); pool(S, M); }
         return;
@@ -575,9 +586,11 @@ export function buildShops(G, fronts) {
       for (const geo of S.glass) put(geo, glass);
       S.inner = S.glass = null;
       // the glass front: mullions, sill and head, the door's frame; fixed panes either side of the door, a pane over it
-      for (const x of [-SHOP_W / 2, -2.2, -DOOR - 0.03, DOOR + 0.03, 2.2, SHOP_W / 2]) put(boxAt(0.07, GLASS - FL, 0.08, x, FL + (GLASS - FL) / 2, 0, '#4A515B'), out);
-      put(boxAt(SHOP_W + 0.14, 0.12, 0.1, 0, FL + 0.06, 0, '#4A515B'), out); put(boxAt(SHOP_W + 0.14, 0.07, 0.1, 0, GLASS + 0.02, 0, '#4A515B'), out);
-      put(boxAt(2 * DOOR + 0.1, 0.06, 0.09, 0, FL + 2.12, 0, '#4A515B'), out);
+      // (in the chain's own colour when its module says: Cộng's olive)
+      const fc = (ch.custom && CUSTOM[ch.custom].frame) || FRAME;
+      for (const x of [-SHOP_W / 2, -2.2, -DOOR - 0.03, DOOR + 0.03, 2.2, SHOP_W / 2]) put(boxAt(0.07, GLASS - FL, 0.08, x, FL + (GLASS - FL) / 2, 0, fc), out);
+      put(boxAt(SHOP_W + 0.14, 0.12, 0.1, 0, FL + 0.06, 0, fc), out); put(boxAt(SHOP_W + 0.14, 0.07, 0.1, 0, GLASS + 0.02, 0, fc), out);
+      put(boxAt(2 * DOOR + 0.1, 0.06, 0.09, 0, FL + 2.12, 0, fc), out);
       for (const [x0, x1] of [[-SHOP_W / 2, -DOOR - 0.03], [DOOR + 0.03, SHOP_W / 2]]) put(new THREE.PlaneGeometry(x1 - x0, GLASS - FL - 0.12).translate((x0 + x1) / 2, FL + 0.12 + (GLASS - FL - 0.12) / 2, 0.01), glass);
       put(new THREE.PlaneGeometry(2 * DOOR, GLASS - FL - 2.15).translate(0, FL + 2.15 + (GLASS - FL - 2.15) / 2, 0.01), glass);
       if (ch.custom) Object.assign(S, CUSTOM[ch.custom].front({ n, D, put, out, faces, decal, decalOn, built, S, GY }));   // (its printing, and what stands out front)
@@ -636,9 +649,17 @@ export function buildShops(G, fronts) {
     poolMesh = mesh(pools, poolM, false, false); if (poolMesh) { poolMesh.renderOrder = 1; poolMesh.visible = night; }
     // the door leaves, instanced (moved as a door opens)
     const leafGlass = new THREE.PlaneGeometry(DOOR, 2.0).translate(0, 1.0, 0);
-    const leafFrame = mergeAll([boxAt(0.04, 2.0, 0.04, -DOOR / 2, 1.0, 0, '#4A515B'), boxAt(0.04, 2.0, 0.04, DOOR / 2, 1.0, 0, '#4A515B'), boxAt(DOOR, 0.05, 0.04, 0, 0.025, 0, '#4A515B'), boxAt(DOOR, 0.05, 0.04, 0, 1.975, 0, '#4A515B'), boxAt(0.03, 0.4, 0.05, DOOR / 2 - 0.08, 1.05, 0, '#C9CED6')]);
+    const leafFrame = mergeAll([boxAt(0.04, 2.0, 0.04, -DOOR / 2, 1.0, 0, FRAME), boxAt(0.04, 2.0, 0.04, DOOR / 2, 1.0, 0, FRAME), boxAt(DOOR, 0.05, 0.04, 0, 0.025, 0, FRAME), boxAt(DOOR, 0.05, 0.04, 0, 1.975, 0, FRAME), boxAt(0.03, 0.4, 0.05, DOOR / 2 - 0.08, 1.05, 0, '#C9CED6')]);
     doorGlass = new THREE.InstancedMesh(leafGlass, glassM, Math.max(1, leafs.length)); doorFrame = new THREE.InstancedMesh(leafFrame, frameM, Math.max(1, leafs.length));
     for (const o of [doorGlass, doorFrame]) { o.frustumCulled = false; o.renderOrder = 2; o.count = leafs.length; built.add(o); }
+    // a chain whose frames have their own colour: its door leaves too (each leaf's colour times the frame's grey)
+    if (stores.some((S) => S.leaf != null && S.ch.custom && CUSTOM[S.ch.custom].frame)) {
+      const base = new THREE.Color(FRAME), c = new THREE.Color();
+      stores.forEach((S) => { if (S.leaf == null) return; const own = S.ch.custom && CUSTOM[S.ch.custom].frame;
+        if (own) { c.set(own); c.r /= base.r; c.g /= base.g; c.b /= base.b; } else c.setRGB(1, 1, 1);
+        doorFrame.setColorAt(S.leaf, c); doorFrame.setColorAt(S.leaf + 1, c); });
+      doorFrame.instanceColor.needsUpdate = true;
+    }
     for (const S of stores) if (S.leaf != null) placeDoor(S);
     buildPeople();
   }
@@ -900,6 +921,9 @@ function propSet(G, n) {
     ktcup: mergeAll([colorize(new THREE.CylinderGeometry(0.036, 0.033, 0.03, 10).translate(0, 0.015, 0), '#2A1D16'), colorize(new THREE.CylinderGeometry(0.04, 0.036, 0.07, 10).translate(0, 0.065, 0), '#B98E66'), colorize(new THREE.CylinderGeometry(0.042, 0.04, 0.03, 10).translate(0, 0.115, 0), '#F3E7D3'), boxAt(0.008, 0.08, 0.008, 0.012, 0.16, 0, '#2B2F36')]),
     plcup: mergeAll([colorize(new THREE.CylinderGeometry(0.04, 0.032, 0.12, 10).translate(0, 0.06, 0), '#C79A6B'), colorize(new THREE.CylinderGeometry(0.042, 0.038, 0.04, 10).translate(0, 0.065, 0), '#006F3C'), boxAt(0.008, 0.08, 0.008, 0.012, 0.15, 0, '#1E1E1E')]),
     medbag: mergeAll([boxAt(0.16, 0.18, 0.06, 0, -0.09, 0, '#F7F9FC'), boxAt(0.161, 0.04, 0.061, 0, -0.06, 0, '#1554D1')]),
+    // Cộng's: an enamel mug (white, the blue rim, a handle) and a glass of cốt dừa (the coconut slush, the coffee over it)
+    cgmug: mergeAll([colorize(new THREE.CylinderGeometry(0.045, 0.045, 0.09, 12).translate(0, 0.045, 0), '#F4F2EC'), colorize(new THREE.CylinderGeometry(0.047, 0.047, 0.014, 12).translate(0, 0.09, 0), '#2F5FA8'), boxAt(0.02, 0.05, 0.012, 0.055, 0.05, 0, '#F4F2EC')]),
+    cgcup: mergeAll([colorize(new THREE.CylinderGeometry(0.04, 0.032, 0.09, 10).translate(0, 0.045, 0), '#F1EADB'), colorize(new THREE.CylinderGeometry(0.042, 0.04, 0.035, 10).translate(0, 0.105, 0), '#5A3A22'), boxAt(0.008, 0.08, 0.008, 0.012, 0.15, 0, '#4E5E2B')]),
     cone: mergeAll([colorize(new THREE.ConeGeometry(0.03, 0.1, 8).rotateX(Math.PI), '#D9A441'), colorize(new THREE.SphereGeometry(0.035, 8, 6).translate(0, 0.065, 0), '#FFF8EC')]),
     bag: mergeAll([boxAt(0.22, 0.24, 0.1, 0, -0.12, 0, '#F4F3EE'), colorize(new THREE.SphereGeometry(0.05, 6, 4).translate(0.04, 0.02, 0), '#3E8E3A')]),
     courier: mergeAll([parkedScooter('#2E9E4A'), boxAt(0.42, 0.42, 0.42, -0.45, 1.05, 0, '#00A651')]),

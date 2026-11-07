@@ -1,5 +1,7 @@
 # My Office
 
+[![npm](https://img.shields.io/npm/v/claude-my-office?label=npm&color=cb3837)](https://www.npmjs.com/package/claude-my-office) [![CI](https://github.com/khanh020905/my-office/actions/workflows/ci.yml/badge.svg)](https://github.com/khanh020905/my-office/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 English · [Tiếng Việt](README.vi.md)
 
 A 3D office where your Claude Code sessions come to work. Each session is a character at a desk:
@@ -28,17 +30,26 @@ You need Node.js 20.9 or newer and Claude Code, on macOS, Linux or Windows. The 
 servers, cleanup) reads each system its own way; opening a session's IDE window and quitting apps are macOS only.
 
 ```bash
-git clone https://github.com/khanh020905/my-office.git && cd my-office
-npm install
-node bin/cli.mjs install --service   # adds the hooks to ~/.claude/settings.json and runs the office at login
-node bin/cli.mjs doctor              # checks Node, the server, every hook and the background service
+npm install -g claude-my-office   # (the command it installs is my-office)
+my-office install --service   # adds the hooks to ~/.claude/settings.json and runs the office at login
+my-office doctor              # checks Node, the server, every hook and the background service
 ```
 
-Then open <http://localhost:4310>.
+Then open <http://localhost:4310>. To try it without installing: `npx claude-my-office start` (the hooks still need
+`npx claude-my-office install`). An npm install keeps its data (settings, the phone PIN, the history vault) in `~/.my-office`,
+so upgrading (`npm install -g claude-my-office@latest`) keeps it.
+
+From the source instead (to change the code):
+
+```bash
+git clone https://github.com/khanh020905/my-office.git && cd my-office
+npm install
+node bin/cli.mjs install --service   # the same commands as `my-office …`, its data in data/
+```
 
 - `install` backs up `settings.json` before changing it and only adds My Office's own hooks. Running it again adds
   nothing twice.
-- To remove everything: `node bin/cli.mjs uninstall`.
+- To remove everything: `my-office uninstall` (from the source: `node bin/cli.mjs uninstall`).
 
 | Command | What it does |
 | --- | --- |
@@ -49,8 +60,8 @@ Then open <http://localhost:4310>.
 | `pin [--new]` | Shows the phone PIN; `--new` changes it and signs every phone out. |
 
 - Restart after changing the code: `launchctl kickstart -k gui/$(id -u)/com.my-office` (macOS) or
-  `systemctl --user restart my-office` (Linux). `node bin/cli.mjs doctor` prints the right command for your system.
-- Logs: `tail -f data/server.log`.
+  `systemctl --user restart my-office` (Linux). `my-office doctor` prints the right command for your system.
+- Logs: `tail -f ~/.my-office/server.log` (from the source: `data/server.log`).
 
 ## What's inside
 
@@ -84,6 +95,13 @@ Then open <http://localhost:4310>.
   come back as soon as there is work, or in the morning. With the city outside they go by the street, each their own way:
   their own scooter from the row parked on the pavement in front of the building, a GrabBike or Xanh SM bike (on the
   back), or a Xanh SM taxi. The session list says where anyone out is ("In Circle K", "Heading home (GrabBike)").
+- **The lift after a restart** (company floor): for the first three minutes after the office's server starts (five when
+  it starts on a new build) the lift is being serviced: doors half open behind a yellow-and-black barrier ("UNDER
+  MAINTENANCE · Sorry for the inconvenience"), the call panel open, the car's light flickering, a technician in blue at
+  work with his toolbox and multimeter. Everyone takes the stairs beside it, slower down and out of breath at the top,
+  and the group chat grumbles. At the end he takes the barrier away and rides the lift down; after a new build he first
+  puts an inspection sticker with the version and the date in the car, which stays there. Nothing waits for it.
+  (`?liftservice`, or `?liftservice=new`, shows it.)
 - **Out of Claude**: when an account's plan limit (the 5 hours or the week) is used up, the people on that account leave
   their desks for a break: a tea at the pantry tables, a book, a chat. A board on the wall counts down to when it can be
   used again; when it resets the bell rings and they go back to their desks. Anyone whose session is still working keeps
@@ -127,6 +145,36 @@ Then open <http://localhost:4310>.
   turns in the light, two or three minutes, "tít tít tít" (with the sound on), the next one steps up. Cá kho or mắm leaves
   smell lines over the corner and a grumble in the group chat; a lid left clipped shut pops. Then lunch at a pantry table
   or at the desk. They don't fetch the GrabFood or go down to the quán cơm (`?comnha` to see it now).
+- **Daily duty rota** (trực nhật, company floor): a whiteboard on the pantry wall names today's four chores and who does
+  them, the turn moving on each working day among the people of the projects here (HR posts the list in the group chat
+  in the morning): wash the cups, which pile up at the sink through the day (the morning coffee, a glass at lunch, the
+  afternoon cà phê) and are washed one by one after the nap; take the bin bag out to the bin room on the stairs' landing
+  at about five; water the plants in the morning; wipe the pantry's tables. Each does it while resting, never in the
+  middle of work. A chore never got to is owed the next morning: the group chat grumbles ("Hôm qua ai trực mà ly chất
+  đống vậy 😤"), the one whose turn it was says sorry and does it first thing (the board says so in red; the bin spills
+  over meanwhile). The 18:30 cleaner mops the floors and leaves the bin to the rota. No duty at the weekend or on public
+  holidays (the official Vietnamese holidays, Tết and Ngày Văn hóa Việt Nam included). Kept in the browser, per day
+  (`?duty` to see every chore now).
+- **Quarterly fire drill** (diễn tập PCCC, company floor): on the first working day of each quarter HR pins the notice
+  in the group chat, and at 15:00 the fire alarm rings (with the sound on) and the horn-strobes on the walls flash. The
+  lift goes down to the ground floor and parks; HR, the floor's fire marshal in a red armband, calls everyone out, and
+  every person on the floor (working or not, the receptionist, the director) walks down the stairs, never the lift,
+  HR last. With the city outside they gather at an assembly point on the pavement by a green "ĐIỂM TẬP KẾT" standee;
+  HR takes the roll on her clipboard ("Có!") and reports the count and the time it took; the guard, the other marshal,
+  lights a practice fire in a steel tray and shows the powder extinguisher (shake, pull the pin, aim at the base,
+  squeeze), the fire goes out, a round of applause, and everyone goes back up in the lift. Purely for show: the
+  sessions keep working throughout. As Vietnam's fire law has it (Luật PCCC và CNCH 2024; Nghị định 105/2025/NĐ-CP,
+  Điều 16: a facility practises its fire plan at least once a year) and the fire police's guidance (stairs only, never
+  the lift). Settings → More turns it off (`?drill` for one now).
+- **Make-up Saturdays and swapped days off** (làm bù, nghỉ bù): the office keeps Vietnam's official calendar, its public
+  holidays and the Government's swaps (a weekday taken off to join a holiday to the weekend, a Saturday worked for it),
+  in a small dated table with each notice (`src/shared/workdays.js`, how to add a year in its comment). On a make-up
+  Saturday the office works as on any weekday: the receptionist at the front desk, lunch from home and the quán cơm,
+  the duty rota; in the morning someone grumbles in the group chat ("Thứ Bảy mà vẫn phải lên công ty 😩 làm bù mà").
+  The day swapped off is a day off (the front desk shut, no lunch, no rota, no Monday stand-up), as are weekends and
+  holidays; on the last afternoon before a break of three days or more someone says how long it is, and which Saturday
+  to come back on. As announced up to now: Saturday 10/1/2026 for Friday 2/1, Saturday 22/8/2026 for Monday 31/8; none
+  for 2027 (the Government chose Tết 4/2–10/2 and Quốc khánh 2/9–5/9 without one).
 - **Farewells** (tiệc chia tay): a project that really was at work (on two days or more) and has had no session for 30
   days (Settings → More: 14, 30, 60 or 90, or off) gets a last afternoon in office hours: its person comes in once more
   with the company card on a lanyard and packs the desk into a cardboard box (the little plant, the mug, the photo frame)
@@ -162,7 +210,16 @@ Then open <http://localhost:4310>.
     in the evening, and on weekend evenings the Snow King himself dancing out front to its tune ("Oh! Susanna").
     Next to it a Highlands Coffee (the deep red sign with its emblem, phin sữa đá and freeze at real prices, laptops in
     the morning) and a Thế Giới Di Động (the long yellow sign with "thegioididong.com" in black, the promotions on the
-    glass, phones on the display tables, staff in yellow, a tube man dancing at the door, 8:00–22:00).
+    glass, phones on the display tables, staff in yellow, a tube man dancing at the door, 8:00–22:00). Where the chain
+    really has shops (Hanoi, Ho Chi Minh City, Đà Nẵng, Nha Trang; painted further down the street in Hải Phòng, Huế and
+    Đà Lạt) a Cộng Cà Phê: the army-green front with CỘNG CÀ PHÊ in warm white letters, the white box with its logo out
+    on a bracket, a little roof of terracotta tiles, a plank painted "Ở ĐÂY CÓ BÁN CÀ PHÊ"; inside the retro look of
+    1980s Hanoi (olive walls, worn wooden floor, low wooden stools, a bench with cushions in the red "chăn con công"
+    print, enamel mugs and thermos flasks, an old radio and a wooden-cased TV, faded photographs and a tear-off calendar),
+    the menu printed like ration coupons at the real prices (cốt dừa cà phê 59.000đ, bạc xỉu 45.000đ), staff in olive,
+    folding metal chairs out front and an old bicycle with a basket of flowers, 7:00–23:00. On weekday afternoons and
+    weekend mornings someone resting goes for a cốt dừa ("Đi Cộng làm ly cốt dừa không?"); walking in, you can order at
+    the counter or sit on the low stool by the window.
     The streets follow the office clock: in the morning and evening rush twice the scooters, riding three abreast and
     crawling; empty streets in the small hours. Cars pull in to the kerb in front of the shops and along the park,
     indicating, and pull out again later; taxis stop for a fare with their hazard lights on. Street food across the
@@ -296,7 +353,34 @@ Then open <http://localhost:4310>.
   (Claude reads it with its next step; once its turn is over, the hint carries the conversation on), and your phone
   gets a notification. It also points out compaction after compaction and spending for 10 minutes with no file edited,
   without blocking anything. Anything you type to the session forgives it. Settings → More: on or off, after how many
-  failures, after how many minutes. Older installs: run `node bin/cli.mjs install` once more to add the hook.
+  failures, after how many minutes. Older installs: run `my-office install` once more to add the hook.
+- **Two sessions on one file, a port someone holds**: when a session is about to edit a file another session edited in
+  the last 20 minutes, its Claude is told first (read it again, don't overwrite the other's changes, ask if the work
+  clashes) and the team chat says so. When a command can't have its port (`EADDRINUSE`, "Port 3000 is in use"), the
+  chat says which server holds it and whose it is, and that session's Claude is told not to kill it. Both go through
+  the stuck-loop hook, so they need nothing more installed.
+- **Pinned notes that survive compaction**: a session's drawer has a **Pinned** tab for what that conversation should
+  always keep in mind ("commit messages in Vietnamese", "never push without asking"). When Claude Code compacts a long
+  conversation, what you said along the way can be summed up away; right after each compaction the office says the
+  pinned notes again (the `SessionStart` hook, source `compact`), and the team chat says so. Kept by conversation in
+  `data/pins.json`, 12 at most. Older installs: run `my-office install` once more to add the hook.
+- **Calls auto mode refused**: when auto mode refuses a call (Claude Code's `PermissionDenied` hook), the team chat gets a
+  card: who, the command, the reason auto mode gave. While an office page is open, Claude Code waits up to 40 s for
+  **Let Claude retry** (Claude is told it may try again; the call goes through auto mode again) or **Keep it refused**;
+  otherwise the refusal stands at once and the card keeps it on record. **Copy command** to run it yourself. Phones
+  answer only when the Mac lets them approve. Older installs: run `my-office install` once more to add the hook.
+- **Undo the last turn**: a resting session's drawer has **↶ Undo last turn**: the files Claude changed with its file
+  tools (Edit, Write…) in its last turn, put back as they were before it, a file it created removed. The office keeps
+  its own copies (the stuck-loop hook, which runs before every call, copies a file the first time a turn touches it,
+  before Claude Code writes it), so it needs nothing from Claude Code's internals. What a terminal command changed
+  (git, sed, a build) is not undone; a file changed again after the turn is left alone; what was there is kept in
+  `data/undo/`. You see each file and what will happen first, two clicks to do it, then **Tell Claude**. From a phone
+  only when work from phones is allowed.
+- **"Fix it" when CI goes red**: when the latest CI run of a repository a session works in fails (read with `gh`), the
+  team chat gets a card from that session with a link to the run and **Fix it**. It hands Claude the run: read the
+  failing step's log, fix it, run that check locally, report back, and don't push. A session at work gets it as a note
+  at its next step; a resting one carries its conversation on. The card says when the CI is green again. From a phone
+  only when work from phones is allowed.
 
 ### Your plan and your Mac
 
@@ -314,6 +398,38 @@ Then open <http://localhost:4310>.
   you write in it again (the office starts it there through the same script; its person waits at the desk meanwhile).
   A session in a terminal gets the command that resumes it there. With switching on, the sessions open on an account
   that runs out for a while (not a short rate limit) move by themselves too; a box under the switch turns that off.
+- **Models: coordinator and subagents** (Settings → More): the model a Claude session runs on (Opus, Sonnet or the
+  default) and the one its subagents run on (the same, Sonnet, Haiku or Opus), so a big task can be coordinated by Opus
+  while Sonnet does the parts. "Always this model for subagents" also overrides the model Claude picks for one
+  (`CLAUDE_CODE_SUBAGENT_MODEL_FORCE`). "Ask Claude to split big tasks among subagents" adds a short note to
+  `~/.claude/CLAUDE.md`, taken out again when off. Written to `~/.claude/settings.json` (`model`,
+  `env.CLAUDE_CODE_SUBAGENT_MODEL`); the other accounts share it by a link. Sessions started from then on use it.
+- **My Office in the Mac's menu bar**: `install` also builds a small menu bar app (the building icon by the clock; it
+  needs Xcode's command line tools): the number of sessions waiting for you, or at work, coloured when a plan's limit
+  runs low; a click (or ⌃⌥O from any app) opens the same small panel as the editor's, a right-click opens the office;
+  a notification when a session starts waiting for you or finishes. In the panel: ↑ ↓ pick a session, Enter brings
+  its window up, Y / N answer the first request to approve, Esc closes it. The office starts it with itself.
+  `--no-menubar` leaves it out.
+- **My Office in the editor's side bar**: `install` also adds a small panel to each editor on the computer (Antigravity,
+  VS Code, Cursor, Windsurf…: its icon in the activity bar): who is working, who waits for you with "Allow / Deny" right
+  there, each tool's limit left; click a session to bring its window forward. It is the office's light page `/panel`
+  (no 3D), so it costs next to nothing; `--no-panel` leaves the editors alone, `uninstall` takes it out.
+- **Codex and Antigravity accounts too**: the plan card has a tab for each beside Claude's (as the phone window's two ways
+  in), each with the account in use's tightest limit and a dot coloured like the bars; only the picked tool's accounts show. **Codex**: the account
+  Codex is signed in with shows by itself, with its 5-hour and weekly usage (read by Codex's own `codex app-server`);
+  "Add a Codex account" opens the ChatGPT sign-in page without signing the current one out; "Use" puts that account's
+  sign-in into `~/.codex/auth.json` (the one there saved first: Codex rotates refresh tokens). A codex started after
+  that uses it; the Codex panel in an editor keeps the old one until you reload the window, and the card says so.
+  **Antigravity IDE**: each account with its quota per model family (the model picked in the agent panel first), as
+  the IDE saved it in its state database (read with `sqlite3`, read-only). The IDE reads its account only as it starts,
+  so with it open a switch waits for a quiet moment: when you close it, or while you are away (10 minutes without a key
+  or the mouse, or a locked screen) with no Claude session in it at work and its own agent idle, the office closes and
+  reopens it behind the app you had in front, every window, tab, unsaved file and Claude conversation back as it was
+  (on a Mac; `OFFICE_AG_AWAY_MIN` sets the minutes). You can also have it done now. Adding one takes the IDE's sign-in
+  out (kept, not signed out) and opens it to sign in again. With "Switch by itself when one runs out" on, both move to
+  the next account with room; Antigravity already at 90% used, so the switch is done before you run out. The sign-ins
+  stay in the office's own data folder (`data/codex`, `data/antigravity`, readable by you only). `OFFICE_AI_ACCOUNTS=0`
+  turns both off.
 - **The Mac pill** opens RAM, swap, CPU and disk. It says why the Mac is slow (memory spilled to disk, who holds the
   most) with one button to close every idle Claude session, and suggests the rest: stop a forgotten dev server, quit a
   heavy app, clear caches. Idle sessions can also be closed on a timer (off by default). Every action is checked first
@@ -352,7 +468,11 @@ Then open <http://localhost:4310>.
 - English or Vietnamese (Settings → Display).
 - Graphics: Auto, Low, Medium or High. Auto steps down by itself when frames come late, and remembers it per device.
 - Streamer mode blurs commands, paths and chat for recording.
-- List mode turns the 3D off and shows sessions as cards. It saves battery and works without WebGL.
+- **2D view** (3D | 2D in the top bar, or `?view=2d`): no 3D, just the sessions as rows, quiet on purpose. Approvals
+  sit on top with their buttons, then needs you, working and resting; tabs count and filter them, a search (`/`) finds
+  one by name, project or branch. Each row: the conversation, its project and branch (or the task it was given), what
+  it is doing now in words of the work, its checklist, context, time and cost, with its subagents under it; a click
+  opens it. Kept per browser. It saves battery and works without WebGL.
 - Open on your phone: same Wi-Fi, or anywhere through the Cloudflare tunnel (below), 6-digit PIN. Watching, plus
   approving if you turn on "Approve from a phone" on the Mac. Claude Code's own Remote Control (`/rc`) works too: the
   session's QR code in its drawer opens that conversation in the Claude app.
@@ -374,12 +494,26 @@ Then open <http://localhost:4310>.
   phone locked. Turned on on each phone (⚙ → More → 📱) over the https address; on an iPhone, add My Office to the home
   screen first (Share → Add to Home Screen: it becomes an app, full screen, with its icon). The Mac's phone window counts
   the phones and sends a test. Subscriptions are posted only to the browsers' own push services.
+- **History vault**: Claude Code deletes a conversation's transcript after 30 days (`cleanupPeriodDays`). The office
+  keeps its words in `data/vault`: what you wrote and what Claude answered, its title, folder and times, from every
+  account, read every 3 hours. No screenshots, commands or their output, so a month of transcripts (GBs) is a few MB.
+  The chat's ••• → **History vault**: search everything that was said (with or without Vietnamese accents), read a
+  conversation laid out, and copy `claude --resume <id>` while its transcript is still there. `OFFICE_VAULT=0` turns
+  it off.
+- **Weekly prompt report** (the vault's second tab, `?vault=report`): the last 7 days of what you wrote to Claude,
+  looked at with the chat's prompt-helper rules: how many were clear enough for Claude to act at once (against the
+  week before), the habits that cost a round trip (a screenshot with a word or two, "this one" with nothing to point
+  at, "make it different" with no criterion, several jobs in one message, too short) with a tip for each, and real
+  examples from the week. Worked out on this computer, no model involved; a line in the chat on Monday morning.
 - **Give work** (📋 in the team chat, or @ a conversation and tap "Give work"): pick a conversation, carried on with
   its whole context as a new branch of it (the one open in your editor is left as it is), or a folder a session has
   worked in, for a new one. Type or speak (🎤, the browser's speech recognition: over https or on the Mac itself), and
   add up to 4 photos. The Mac runs it as `claude -p`; its commands ask for approval like any session's, and its answer
   comes back to the chat. From a phone only once "Give Claude work from a phone" is on, on the Mac; at most 3 at a
   time and 12 an hour.
+- **Quick commands**: writing "To" a conversation, a row of chips over the input fills in a prompt you use often (run
+  the tests, commit and push, deploy…). ✎ edits them (up to 12, kept on the Mac, the same on your phone), and
+  **⭐ Save this** keeps what you are writing as one more in one tap, named after its first words.
 - **Phone work as background sessions** (the phone window, under "Give Claude work from a phone"; off by default): each
   piece of work is a Claude Code background session (`claude --bg`, agent view, Claude Code 2.1.257 or newer) instead of
   `claude -p`. Its card still shows its steps, Stop and its answer, from the session's own hooks; an approval or a
@@ -464,7 +598,7 @@ Then open <http://localhost:4310>.
 npm install
 npm run dev                   # Turbopack with hot reload: http://localhost:4310/?demo
 npm run lint && npm run typecheck && npm test
-npm run build && npm run test:e2e   # all of them (CI runs the @smoke ones: no GPU there)
+npm run build && npm run test:e2e   # all of them (CI: the @smoke ones on every push, all of them split across runners in e2e-full.yml)
 node scripts/build-demo.mjs   # the static online demo, into demo-site/
 node scripts/record-gif.mjs   # this README's GIF, recorded from a running office
 npm run smoke                 # starts the built server and checks it works on this system
@@ -497,6 +631,7 @@ request.
 | The Thế Giới Di Động shop | drawn and modelled in code (`shop-tgdd.js`): no artwork of the chain's | the name is its owner's trademark, not affiliated |
 | The Katinat shop | drawn and modelled in code (`shop-katinat.js`): no artwork of the chain's | the name is its owner's trademark, not affiliated |
 | The Phúc Long shop | drawn and modelled in code (`shop-phuclong.js`): no artwork of the chain's | the name is its owner's trademark, not affiliated |
+| The Cộng Cà Phê shop | drawn and modelled in code (`shop-cong.js`): no artwork of the chain's, only its generic retro look | the name and its logo are its owner's trademarks, not affiliated |
 | The Long Châu pharmacy | drawn and modelled in code (`shop-longchau.js`): no artwork of the chain's | the names (Long Châu, FPT Retail) are their owner's trademarks, not affiliated |
 | The Điện Máy Xanh shop | drawn and modelled in code (`shop-dmx.js`): no artwork of the chain's | the name is its owner's trademark, not affiliated |
 | The Vietcombank ATM booth | drawn and modelled in code (`street-atm.js`): no artwork of the bank's | the name is its owner's trademark, not affiliated |

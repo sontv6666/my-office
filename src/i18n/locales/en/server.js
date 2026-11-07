@@ -6,8 +6,19 @@ export default {
     downloadFailed: "Couldn't download cloudflared (status {status}). Check the network and turn it on again.",
     ready: 'Away from home: {url}',
     dropped: 'The tunnel dropped, connecting again…',
+    badHost: 'That is not a host name, e.g. office.example.com.',
+    busy: 'A fixed address is being set up; wait for it to finish.',
+    loginFailed: "Couldn't sign in to Cloudflare (the page was closed or 5 minutes went by). Try again.",
+    createFailed: "Couldn't create the tunnel \"{name}\" on Cloudflare.",
+    noCred: 'The tunnel "{name}" is on Cloudflare but its key is not on this Mac (made elsewhere?). Delete it in Cloudflare and try again.',
+    hostTaken: '{host} already has a DNS record pointing elsewhere; pick another name (the office never overwrites one).',
+    routeFailed: "Couldn't point {host} at the tunnel (the domain must be in your Cloudflare account).",
+    revoked: 'Cloudflare took the old address back, getting a new one…',
+    newTitle: 'The office has a new address',
+    newBody: 'Cloudflare took the old address back. The new one: {url}',
   },
   move: {
+    resumePrompt: 'Carry on with the work in progress (the last turn was cut off because the previous account ran out).',
     notOpen: 'This session is no longer open.',
     noAccount: "Can't find that account.",
     same: 'This session is on {to} already.',
@@ -25,6 +36,27 @@ export default {
     installFailed: "Couldn't connect the new folder to the office.",
     onMac: 'Accounts can only be added on this computer.',
     main: 'the main account',
+  },
+  // Settings → More: the models of a session and its subagents (server/models.mjs)
+  models: {
+    unreadable: "Couldn't read ~/.claude/settings.json (it may have comments). Set the model there by hand.",
+    failed: "Couldn't write Claude Code's settings.",
+    splitNote: '## Big tasks: hand parts to subagents\nWhen a task has several independent parts (reading or researching in many places, edits that don\'t touch each other), give each part to a subagent with the Agent tool, and run the independent ones in parallel. This session coordinates: it splits the work, writes each subagent a brief with the context it needs, puts the results together and checks them before saying it is done. Small tasks, or ones that need one unbroken line of context, it does itself.',
+  },
+  ai: {
+    noAccount: 'That account is no longer in the list.',
+    noCopy: "The office has no saved sign-in for that account. Add it again.",
+    seatFailed: "Couldn't write Codex's sign-in file.",
+    inSeat: "That's the account in use. Switch to another one first.",
+    noCli: "Couldn't find Codex on this computer (the codex program, or an editor's Codex extension).",
+    loginFailed: "Couldn't start Codex's sign-in.",
+    noToken: 'The office has no saved sign-in for that account.',
+    writeFailed: "Couldn't write {app}'s settings.",
+    busy: { one: '{n} Claude session in {app} is still working. Wait for it to finish, or close {app} yourself.', other: '{n} Claude sessions in {app} are still working. Wait for them to finish, or close {app} yourself.' },
+    quitFailed: "{app} didn't close (it may be asking to save a file). Close it yourself and the switch happens straight away.",
+    needsRestart: '{app} is open: it has to be closed and opened again.',
+    noRestart: 'The office can only close and reopen {app} on a Mac. Close it yourself and the switch happens straight away.',
+    noDb: "Couldn't read {app}'s settings (is {app} installed, and the sqlite3 program?).",
   },
   forbidden: 'Not allowed.',
   badRequest: 'Invalid request.',
@@ -85,6 +117,35 @@ export default {
     resting: '{name} is already resting: nothing to stop.',
     gone: 'This session has closed.',
   },
+  // a repository's CI gone red: the chat card's "Fix it" hands Claude the failing run
+  ci: {
+    pushTitle: '🔴 {repo}: CI is red',
+    pushBody: '{wf} on {branch} just failed. Open the group chat and tap "Fix it" to have Claude fix it.',
+    fix: 'CI "{wf}" on branch {branch} just went red: {url}\nRead the failing step\'s log (gh run view {run} --log-failed), find the cause, fix it, then run that same check here. When done, tell me why it failed and what you changed. Don\'t push until I say so.',
+    gone: 'This CI card is gone.',
+    notRed: 'This CI is no longer red.',
+  },
+  // two sessions on one file, a port another process holds (server/overlap.mjs): said to Claude with its next call
+  overlap: {
+    file: "[My Office] Another session on this computer, “{name}”, edited this file at {time}. Read the file again right before editing it and don't overwrite that session's changes; if the two pieces of work clash, stop and ask the user.",
+    port: "[My Office] Port {port} is held by {holder}. It may be another session's or the user's: don't stop or kill that process yourself; use another port, or ask the user.",
+    holder: '{label} (running {up})',
+    holderOf: '{label} from {owner} (running {up})',
+    someone: 'another process',
+  },
+  // "Ghi nhớ cho Claude": what you pinned, said again after a compaction
+  pins: {
+    context: '[My Office] This conversation was just compacted. The user pinned the following for it; keep following them:',
+    noSid: "This conversation's id isn't known yet: send it a message first.",
+    full: 'Already {n} pinned notes: remove one first.',
+  },
+  // "Hoàn tác lượt cuối": the last turn's files put back
+  undo: {
+    busy: '{name} is working: wait until it is done to undo.',
+    nothing: 'Nothing left to undo.',
+    tell: "[My Office] The user just undid the previous turn's file changes; these files are back as they were before it: {files}. Read them again before going on, and don't redo those changes unless asked.",
+  },
+  deny: { over: 'This call is no longer waiting: Claude has moved on.' },
   // the prompt cache's clock: a session waiting for you is about to go cold (off unless turned on)
   cache: {
     nudgeTitle: { one: '☕ {name} goes cold in {n} minute', other: '☕ {name} goes cold in {n} minutes' },
@@ -132,6 +193,9 @@ export default {
     httpError: 'Anthropic returned error {status}.',
     offline: "Couldn't reach Anthropic (offline?).",
     newAccount: 'Reading the limits of the account you just signed in to…',
+    tokenExpired: 'Its sign-in token has run out (the account was not used for a while). The office renews it every few hours, or press Renew.',
+    renewing: 'Renewing its sign-in token…',
+    renewFailed: "Couldn't renew its sign-in token: open Claude Code with this account once, or sign in again.",
   },
   api: {
     approveOnMac: 'Approvals only work on the {mac}.',

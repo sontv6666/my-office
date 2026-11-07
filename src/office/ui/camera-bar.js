@@ -26,7 +26,7 @@ export function showPerson(w) {
   panBack = null; clearTimeout(panTimer); state.lastUserCam = performance.now();
   focusTarget.set(w.pos.x, 0.9, w.pos.y);
 }
-export function goView(v) { const V = VIEWS[v]; focusTarget.set(...V.t); state.zoomGoal = V.z * BASE_ZOOM; setView(v); }
+export function goView(v) { const V = VIEWS?.[v]; if (!V || !focusTarget) return; focusTarget.set(...V.t); state.zoomGoal = V.z * BASE_ZOOM; setView(v); }
 
 export function setup() {
   /* ---------- camera toolbar ---------- */

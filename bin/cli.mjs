@@ -10,13 +10,16 @@ import { fileURLToPath } from 'node:url';
 import { createPrefs } from '../server/prefs.mjs';
 import { serviceFor } from './service.mjs';
 import { addOtel, collectorSnippet, managedEnvs, otelOwner, removeOtel } from '../server/otel-setup.mjs';
+import { dataDir } from '../server/data-dir.mjs';
+import { buildVsix, installPanel, uninstallPanel, panelIn } from '../server/vsix.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOME = os.homedir();
 const PORT = Number(process.env.OFFICE_PORT || 4310);
 // Words in the office's language (data/prefs.json, picked in Settings; OFFICE_LANG until then), same folder as the server's.
-// the server's data folder (OFFICE_DATA_DIR for a second copy; the launchd service and the hooks always use data/)
-const DATA_DIR = process.env.OFFICE_DATA_DIR ? path.resolve(process.env.OFFICE_DATA_DIR) : path.join(ROOT, 'data');
+// the server's data folder (OFFICE_DATA_DIR for a second copy; the background service and the hooks always use the default
+// one: data/ here, or ~/.my-office when npm installed the office: server/data-dir.mjs)
+const DATA_DIR = dataDir(ROOT);
 const { tr } = createPrefs(DATA_DIR);
 const minutesAgo = (ms) => tr('time.ago', { time: tr('time.min', { n: Math.max(0, Math.round((Date.now() - ms) / 60000)) }) });
 const args = process.argv.slice(2), cmd = args[0] && !args[0].startsWith('-') ? args[0] : 'start';
@@ -36,18 +39,24 @@ const PERM_CMD = hookCmd('/hook/permission', true);
 // Claude's questions (AskUserQuestion) and plans (ExitPlanMode) are answered through PreToolUse, the documented way.
 const ASK_CMD = hookCmd('/hook/question', true);
 const ASK_MATCHER = 'AskUserQuestion|ExitPlanMode';
+// A call auto mode refused (PermissionDenied): a card in the office, and while one is open, a moment to let Claude retry.
+const DENY_CMD = hookCmd('/hook/denied', true);
 // Before each step, a quick word with the office (server/loops.mjs): a call that keeps failing the same way is blocked.
 // 0.3 s at most, and nothing printed when the office is down or slow: the call goes ahead as if there were no hook.
 const LOOP_CMD = WIN ? `${SEND} http://127.0.0.1:${PORT}/hook/loop --fast`
   : `curl -s -m 0.3 -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:${PORT}/hook/loop || true`;
+// After Claude Code compacts a conversation (SessionStart, source "compact"): what you pinned for it, said again. A few
+// seconds at most, nothing printed when the office is down: the conversation goes on as if there were no hook.
+const START_CMD = WIN ? `${SEND} http://127.0.0.1:${PORT}/hook/start --wait 3`
+  : `curl -s -m 3 -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:${PORT}/hook/start || true`;
 // The status line feeds the plan's 5-hour / 7-day usage; an existing status line keeps running through ours.
-const STATUS_SCRIPT = path.join(ROOT, 'hooks', 'status-line.mjs'), STATUS_PREV = path.join(ROOT, 'data', 'statusline-prev.json');
+const STATUS_SCRIPT = path.join(ROOT, 'hooks', 'status-line.mjs'), STATUS_PREV = path.join(dataDir(ROOT, {}), 'statusline-prev.json');
 const STATUS_CMD = WIN ? `"${fwd(process.execPath)}" "${fwd(STATUS_SCRIPT)}"` : `"${process.execPath}" "${STATUS_SCRIPT}"`;
 const oursStatus = (s) => typeof s?.command === 'string' && s.command.includes('status-line.mjs') && (s.command.includes(ROOT) || s.command.includes(fwd(ROOT)));
 const ours = (h) => typeof h?.command === 'string' && h.command.includes(`127.0.0.1:${PORT}/`);
 // --lan opens the server to the home wifi so a phone can watch (QR code or PIN). Off by default.
 const LAN = args.includes('--lan');
-const service = () => serviceFor({ root: ROOT, server: path.join(ROOT, 'server', 'index.mjs'), log: path.join(ROOT, 'data', 'server.log'), host: LAN ? '0.0.0.0' : '127.0.0.1', port: PORT });
+const service = () => serviceFor({ root: ROOT, server: path.join(ROOT, 'server', 'index.mjs'), log: path.join(dataDir(ROOT, {}), 'server.log'), host: LAN ? '0.0.0.0' : '127.0.0.1', port: PORT });
 const ok = (s) => console.log(`  ✓ ${s}`), warn = (s) => console.log(`  ⚠ ${s}`), bad = (s) => console.log(`  ✗ ${s}`);
 
 async function readSettings() { try { return JSON.parse(await fsp.readFile(SETTINGS, 'utf8')); } catch (e) { if (e.code === 'ENOENT') return {}; throw new Error(tr('cli.readFailed', { file: SETTINGS, error: e.message })); } }
@@ -78,6 +87,10 @@ async function install() {
   const pre = (cfg.hooks.PreToolUse ||= []);
   if (!args.includes('--no-approve') && !pre.some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/question')))) { pre.push({ matcher: ASK_MATCHER, hooks: [{ type: 'command', command: ASK_CMD, timeout: 55 }] }); added++; }
   if (!args.includes('--no-loop-guard') && !pre.some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/loop')))) { pre.push({ hooks: [{ type: 'command', command: LOOP_CMD, timeout: 2 }] }); added++; }
+  const start = (cfg.hooks.SessionStart ||= []);
+  if (!args.includes('--no-pins') && !start.some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/start')))) { start.push({ matcher: 'compact', hooks: [{ type: 'command', command: START_CMD, timeout: 5 }] }); added++; }
+  const denied = (cfg.hooks.PermissionDenied ||= []);
+  if (!args.includes('--no-approve') && !denied.some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/denied')))) { denied.push({ hooks: [{ type: 'command', command: DENY_CMD, timeout: 45 }] }); added++; }
   if (!args.includes('--no-status') && !oursStatus(cfg.statusLine)) {
     if (cfg.statusLine?.command) { await fsp.mkdir(path.dirname(STATUS_PREV), { recursive: true }); await fsp.writeFile(STATUS_PREV, JSON.stringify(cfg.statusLine)); ok(tr('cli.install.statusKept')); }
     cfg.statusLine = { type: 'command', command: STATUS_CMD, ...(cfg.statusLine?.padding != null ? { padding: cfg.statusLine.padding } : {}) };
@@ -90,13 +103,66 @@ async function install() {
   if (otel.added) ok(tr('cli.install.otel', { file: SETTINGS }));
   if (otel.theirs) { warn(tr('cli.install.otelTheirs', { where: otel.theirs.join('; ') })); console.log(`\n${collectorSnippet(PORT).replace(/^/gm, '    ')}\n`); }
   if (args.includes('--service') && !opt('--settings')) {
-    await fsp.mkdir(path.join(ROOT, 'data'), { recursive: true });
+    await fsp.mkdir(dataDir(ROOT, {}), { recursive: true });
     ensureBuild();
     const svc = service();
     if (await svc.install()) ok(tr('cli.install.service', { file: svc.file })); else warn(tr('cli.install.noService'));
     LAN ? warn(tr('cli.install.lan')) : ok(tr('cli.install.local'));
   }
+  if (!args.includes('--no-panel') && !opt('--settings')) await panel();
+  if (!args.includes('--no-menubar') && !opt('--settings') && process.platform === 'darwin') menubar();
   console.log(`\n${tr('cli.install.next', { port: PORT })}`);
+}
+/* The Mac's menu bar icon (menubar/MyOfficeBar.swift): built here with the Swift compiler of Xcode's command line tools
+   into an app of its own in the data folder (no Dock icon; it may talk to 127.0.0.1), signed for this Mac only, and
+   started; the office starts it again each time it starts. Its logo (menubar/AppIcon.icns, the building of app/icon.svg)
+   is what macOS shows on its notifications. macOS remembers an app's logo for notifications by its identifier the first
+   time it meets it: the first builds had no logo, so it kept a blank square under com.my-office.menubar however the
+   app changed. Hence a new identifier; changing the logo again later needs another one. */
+const MENUBAR_APP = path.join(dataDir(ROOT, {}), 'menubar', 'My Office.app'), MENUBAR_BIN = 'My Office.app/Contents/MacOS/MyOfficeBar';
+const PLIST = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>com.my-office.bar</string>
+  <key>CFBundleName</key><string>My Office</string>
+  <key>CFBundleDisplayName</key><string>My Office</string>
+  <key>CFBundleExecutable</key><string>MyOfficeBar</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+</dict></plist>
+`;
+function menubar() {
+  try { execFileSync('xcrun', ['--find', 'swiftc'], { stdio: 'ignore' }); } catch { warn(tr('cli.install.noSwift')); return; }
+  const mac = path.join(MENUBAR_APP, 'Contents', 'MacOS');
+  try {
+    fs.mkdirSync(mac, { recursive: true });
+    execFileSync('xcrun', ['swiftc', '-O', '-o', path.join(mac, 'MyOfficeBar'), path.join(ROOT, 'menubar', 'MyOfficeBar.swift')], { stdio: 'ignore', timeout: 300_000 });
+    fs.writeFileSync(path.join(MENUBAR_APP, 'Contents', 'Info.plist'), PLIST);
+    fs.mkdirSync(path.join(MENUBAR_APP, 'Contents', 'Resources'), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, 'menubar', 'AppIcon.icns'), path.join(MENUBAR_APP, 'Contents', 'Resources', 'AppIcon.icns'));
+    execFileSync('codesign', ['-s', '-', '--force', MENUBAR_APP], { stdio: 'ignore' });
+  } catch { warn(tr('cli.install.menubarFailed')); return; }
+  // tell macOS the app changed, so notifications pick up the new logo instead of the blank one it remembered
+  try { execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-f', MENUBAR_APP], { stdio: 'ignore', timeout: 15_000 }); } catch { /* only the logo waits */ }
+  try { execFileSync('pkill', ['-f', MENUBAR_BIN], { stdio: 'ignore' }); } catch { /* not running */ }
+  // `open` right after pkill fails (-600) while the old copy is still quitting, which left no icon at all: wait it out
+  const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  for (let i = 0; i < 25; i++) { try { execFileSync('pgrep', ['-f', MENUBAR_BIN], { stdio: 'ignore' }); nap(200); } catch { break; } }
+  for (let i = 0; i < 3; i++) {
+    try { execFileSync('open', ['-g', MENUBAR_APP, '--args', String(PORT)], { stdio: 'ignore', timeout: 15_000 }); break; } catch { nap(1000); }   // else the office starts it next time
+  }
+  ok(tr('cli.install.menubar'));
+}
+// the small panel in the side bar of each editor on this computer (vscode-extension/, packed by server/vsix.mjs)
+async function panel() {
+  let vsix;
+  try { vsix = buildVsix(path.join(ROOT, 'vscode-extension'), path.join(dataDir(ROOT, {}), 'my-office-panel.vsix')); } catch { warn(tr('cli.install.noPanel')); return; }
+  const done = await installPanel(vsix);
+  for (const e of done) e.ok ? ok(tr('cli.install.panel', { app: e.app })) : warn(tr('cli.install.panelFailed', { app: e.app }));
 }
 async function uninstall() {
   console.log(tr('cli.uninstall.title'));
@@ -117,6 +183,11 @@ async function uninstall() {
   // The login service is machine-wide: only touch it when working on the real settings (not a --settings copy).
   if (!opt('--settings') && (await service().uninstall())) ok(tr('cli.uninstall.service'));
   if (!opt('--settings') && unwrapEditors()) ok(tr('cli.uninstall.editors'));
+  if (!opt('--settings')) for (const e of await uninstallPanel()) if (e.ok) ok(tr('cli.uninstall.panel', { app: e.app }));
+  if (!opt('--settings') && fs.existsSync(MENUBAR_APP)) {
+    try { execFileSync('pkill', ['-f', MENUBAR_BIN], { stdio: 'ignore' }); } catch { /* not running */ }
+    fs.rmSync(path.dirname(MENUBAR_APP), { recursive: true, force: true }); ok(tr('cli.uninstall.menubar'));
+  }
 }
 // the editors' Claude Code started through the office's account script (the plan card's "Use" / switching): taken out,
 // or Claude Code wouldn't start once the office is gone
@@ -151,6 +222,10 @@ async function doctor() {
   ask ? ok(tr('cli.doctor.ask')) : warn(tr('cli.doctor.noAsk'));
   const loop = (cfg.hooks?.PreToolUse || []).some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/loop')));
   loop ? ok(tr('cli.doctor.loop')) : warn(tr('cli.doctor.noLoop'));
+  const pinsHook = (cfg.hooks?.SessionStart || []).some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/start')));
+  pinsHook ? ok(tr('cli.doctor.pins')) : warn(tr('cli.doctor.noPins'));
+  const deny = (cfg.hooks?.PermissionDenied || []).some((e) => (e.hooks || []).some((h) => ours(h) && h.command.includes('/hook/denied')));
+  deny ? ok(tr('cli.doctor.denied')) : warn(tr('cli.doctor.noDenied'));
   oursStatus(cfg.statusLine) ? ok(tr('cli.doctor.status')) : warn(tr('cli.doctor.noStatus'));
   const own = otelOwner({ settings: cfg, file: SETTINGS, shell: process.env, managed: managedEnvs() });
   if (own.state === 'ours') ok(tr('cli.doctor.otel'));
@@ -167,6 +242,9 @@ async function doctor() {
       else warn(tr('cli.doctor.statusSilent'));
     }
   }
+  const inEditors = panelIn();
+  inEditors.length ? ok(tr('cli.doctor.panel', { apps: inEditors.join(', ') })) : warn(tr('cli.doctor.noPanel'));
+  if (process.platform === 'darwin') fs.existsSync(MENUBAR_APP) ? ok(tr('cli.doctor.menubar')) : warn(tr('cli.doctor.noMenubar'));
   const svc = service(), st = await svc.state();
   if (st === 'running') ok(tr('cli.doctor.serviceUp'));
   else if (st === 'stopped') warn(tr('cli.doctor.serviceDown', { restart: svc.restart }));

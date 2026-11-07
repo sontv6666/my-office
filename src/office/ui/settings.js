@@ -1,5 +1,6 @@
 // Settings popover: backdrop, floor plan, look, time, toggles.
 import { state } from '../core/state.js';
+import { needWorld } from '../core/world-boot.js';
 import { $, LAYOUT, PLANS, STATIC } from '../core/env.js';
 import { bubbleText } from './event-text.js';
 import { labels } from '../scene/renderer.js';
@@ -8,6 +9,7 @@ import { isNightHour, night, setNight } from '../world/room-update.js';
 import { queueUi, renderFeed, toast } from './activity.js';
 import { renderChat, renderSessionHead, tab } from './session-drawer.js';
 import { renderLimits } from './mac-drawer.js';
+import { renderAi } from './ai-accounts.js';
 import { stickyNotes } from './whiteboard.js';
 import { setLook } from './look-switch.js';
 import { sfx } from '../audio/sfx.js';
@@ -54,7 +56,7 @@ function showTab(k, focus = false) {
 export function togglePop(open = popLook.hidden) { popLook.hidden = !open; btnLook.setAttribute('aria-expanded', String(open)); if (open) { togglePlan(false); showTab(tabNow); } }
 let popPlan;
 let btnPlan;
-export function togglePlan(open = popPlan.hidden) { popPlan.hidden = !open; btnPlan.setAttribute('aria-expanded', String(open)); if (open) { togglePop(false); renderLimits(); } }
+export function togglePlan(open = popPlan.hidden) { popPlan.hidden = !open; btnPlan.setAttribute('aria-expanded', String(open)); if (open) { togglePop(false); renderLimits(); renderAi(); } }
 function setStreamer(v) {
   state.streamer = v; document.body.classList.toggle('is-stream', v); state.boardDirty = true; for (const n of stickyNotes) if (n) n.key = '';
   try { localStorage.setItem('office-stream', v ? 'on' : 'off'); } catch { /* storage blocked */ }
@@ -67,6 +69,7 @@ function setToggle(k, v) {
   if (k === 'perm') { state.permOn = v; try { localStorage.setItem('office-perm', v ? 'on' : 'off'); } catch { /* storage blocked */ } reportPresence(); }
   if (k === 'stream') setStreamer(v);
   if (k === 'coach') { try { localStorage.setItem('office-coach', v ? 'on' : 'off'); } catch { /* storage blocked */ } }   // (the chat's prompt helper reads it as you type)
+  if (k === 'drill') { try { localStorage.setItem('office-drill', v ? 'on' : 'off'); } catch { /* storage blocked */ } }   // (life/drill.js reads it when the day comes)
   if (k === 'zones') { state.zonesOn = v; try { localStorage.setItem('office-zones', v ? 'on' : 'off'); } catch { /* storage blocked */ } }
   if (k === 'season') {   // decorations are built when the page loads
     try { localStorage.setItem('office-season', v ? 'on' : 'off'); } catch { /* storage blocked */ }
@@ -75,8 +78,8 @@ function setToggle(k, v) {
   syncToggles();
 }
 export function syncToggles() {
-  let seasonOn = true, coachOn = true; try { seasonOn = localStorage.getItem('office-season') !== 'off'; coachOn = localStorage.getItem('office-coach') !== 'off'; } catch { /* storage blocked */ }
-  const val = { sound: sfx.on, autocam: state.camAuto, perm: state.permOn, stream: state.streamer, zones: state.zonesOn, season: seasonOn, coach: coachOn };
+  let seasonOn = true, coachOn = true, drillOn = true; try { seasonOn = localStorage.getItem('office-season') !== 'off'; coachOn = localStorage.getItem('office-coach') !== 'off'; drillOn = localStorage.getItem('office-drill') !== 'off'; } catch { /* storage blocked */ }
+  const val = { sound: sfx.on, autocam: state.camAuto, perm: state.permOn, stream: state.streamer, zones: state.zonesOn, season: seasonOn, coach: coachOn, drill: drillOn };
   labels.domElement.classList.toggle('show-zones', state.zonesOn);
   for (const b of document.querySelectorAll('[data-tgl]')) b.setAttribute('aria-checked', String(!!val[b.dataset.tgl]));
 }
@@ -105,12 +108,12 @@ export function setup() {
   popLook.addEventListener('click', (e) => {
     const tb = e.target.closest('[data-st-tab]'); if (tb) { showTab(tb.dataset.stTab); return; }
     if (e.target.closest('#st-close')) { togglePop(false); btnLook.focus(); return; }
-    const sc = e.target.closest('[data-scene]'); if (sc) { setScene(sc.dataset.scene); return; }
+    const sc = e.target.closest('[data-scene]'); if (sc) { needWorld(); setScene(sc.dataset.scene); return; }   // (the 2D list opened first: these change the 3D world)
     const lk = e.target.closest('[data-look]'); if (lk) { setLook(lk.dataset.look); return; }
     const ly = e.target.closest('[data-layout]'); if (ly) { setLayout(ly.dataset.layout); return; }
     const lg = e.target.closest('[data-lang]'); if (lg) { setLang(lg.dataset.lang); return; }
-    const tm = e.target.closest('[data-time]'); if (tm) { setTimeMode(tm.dataset.time); return; }
-    const qb = e.target.closest('[data-quality]'); if (qb) { setQuality(qb.dataset.quality); return; }
+    const tm = e.target.closest('[data-time]'); if (tm) { needWorld(); setTimeMode(tm.dataset.time); return; }
+    const qb = e.target.closest('[data-quality]'); if (qb) { needWorld(); setQuality(qb.dataset.quality); return; }
     const tg = e.target.closest('[data-tgl]'); if (tg) setToggle(tg.dataset.tgl, tg.getAttribute('aria-checked') !== 'true');
   });
   document.body.classList.toggle('is-stream', state.streamer);

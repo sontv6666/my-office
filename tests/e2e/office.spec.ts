@@ -29,6 +29,7 @@ for (const layout of ['pro', 'cozy', 'hq']) {
 }
 
 test('panels open and close', async ({ page }) => {
+  test.setTimeout(180_000);   // (a Mac rendering it in software takes ~100 s for all of it, before and after 1/11: not a regression)
   await page.addInitScript(() => { try { localStorage.setItem('office-quality', 'low'); } catch { /* private mode */ } });   // (a software-rendered page is slow enough at full quality to time out)
   const errors = watchErrors(page);
   await page.goto('/?demo&layout=pro');
@@ -45,7 +46,8 @@ test('panels open and close', async ({ page }) => {
   await page.click('#tl-close');
   await page.click('#btn-lite');
   await expect(page.locator('#lite')).toBeVisible();
-  await page.click('#btn-lite');
+  await page.click('.tb-view [data-view="3d"]');   // (the toolbar is gone in 2D: the top bar's 3D | 2D brings the office back)
+  await expect(page.locator('#lite')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
@@ -158,7 +160,7 @@ test('the group chat: people post, a poll, @ someone and they answer, a reply, r
   // (list mode: the office keeps going behind the chat, drawn once a second; a headless browser draws it slowly)
   await page.addInitScript(() => { try { localStorage.setItem('office-quality', 'low'); localStorage.setItem('office-lite', 'on'); if (!sessionStorage.getItem('e2e-chat')) { localStorage.removeItem('office-chat-demo'); sessionStorage.setItem('e2e-chat', '1'); } } catch { /* private mode */ } });   // (cleared once: not again on the reload below)
   await page.goto('/?demo&debug&layout=pro');
-  await expect(page.locator('#rail-list .ri').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#lite .v2-row').first()).toBeVisible({ timeout: 60_000 });
   type Eng = { poll: (from: string, q: string, o: string[]) => void, remind: (from: string, t: string, at: number, rep: string) => void };
   type Chat = { chat: { msgs: { kind: string, from: string, text: string }[] }, chatSay: (from: string, text: string, o?: object) => void, chatEngine: () => Eng,
     sessions: Map<string, { id: string, name: string, title?: string }>, pauseDemo: () => void };
@@ -484,6 +486,15 @@ test('giving Claude work from the chat: a folder or a tagged conversation, the r
   await zc.locator('.zc-quick-ed .zc-quick-c.is-save').click();
   await expect(zc.locator('.zc-quick .zc-quick-c', { hasText: 'Lint' })).toBeVisible();
   expect((await (await request.get('/api/quick')).json()).list.at(-1).prompt).toBe('Run the linter.');
+  // ⭐ keeps what you are writing as one more, in one tap, named after its first words; not for one already kept
+  const keep = zc.locator('.zc-quick .zc-quick-c.is-keep');
+  await expect(keep).toBeHidden();
+  await zc.locator('.zc-in').fill('Check the bundle size of the landing page and list the three biggest imports');
+  await keep.click();
+  await expect(zc.locator('.zc-quick .zc-quick-c', { hasText: 'Check the bundle size…' })).toBeVisible();
+  expect((await (await request.get('/api/quick')).json()).list.at(-1).prompt).toBe('Check the bundle size of the landing page and list the three biggest imports');
+  await expect(keep).toBeHidden();   // (that text is one of them now)
+  await zc.locator('.zc-in').fill('');
   // a photo with what you write: from this device, made smaller, read by Claude from its path
   const chooser = page.waitForEvent('filechooser');
   await zc.locator('.zc-bar .zc-photo-btn, .zc-toolbar .zc-photo-btn').first().click();
@@ -1275,6 +1286,13 @@ test('the machine drawer says why it is slow, closes idle sessions in one go and
   expect(segs).toBeGreaterThan(2);
   await expect(body.locator('.held-legend li')).toHaveCount(segs);
   await expect(body.locator('.row--ide .ide-parts li').first()).toBeVisible();
+  // the Claude sessions as you know them: the conversation's title, the app it runs in and since when, the one you are in
+  const you = body.locator('.row--you');
+  await expect(you).toHaveCount(1);
+  await expect(you.locator('.row-name')).toContainText('New hero section and WebP images');
+  await expect(you.locator('.row-badge--you')).toHaveText("you're talking here");
+  await expect(you.locator('.row-sub').first()).toHaveText(/^Cursor · opened .*\d\d:\d\d · ~\/projects\/landing-page$/);
+  await expect(body.locator('.row-name', { hasText: 'Cart pagination and shipping fees' })).toBeVisible();
   // the main action asks first, then (in the demo) does nothing on a real machine. Both clicks in one go: the drawer is
   // rebuilt every 5 seconds and the question goes away after 4.5, longer than a slow page takes between two steps.
   await expect(body.locator('.verdict-acts .btn--primary')).toBeVisible({ timeout: 10_000 });

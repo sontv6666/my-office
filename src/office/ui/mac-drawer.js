@@ -10,7 +10,7 @@ import { TOKEN } from '../net/live.js';
 import { DEMO, demoMac } from '../demo/demo.js';
 import { icon } from './icons.js';
 import { strandedSection, strandedHolding } from './stranded.js';
-import { t as tr, num } from '../../i18n/index.js';
+import { t as tr, num, locale } from '../../i18n/index.js';
 
 export let macSnap = null;
 let confirmKey = null;
@@ -25,12 +25,12 @@ export const pollMac = () => { if (document.visibilityState === 'visible') loadM
 // button that no longer exists (the next reading draws it)
 let pressing = false;
 export async function loadMac() {
-  if (DEMO) { macSnap = demoMac(); renderMacButton(); syncDevBoxes(macSnap); if (!drM.hidden && !pressing && !strandedHolding()) renderMac(); return; }
+  if (DEMO) { macSnap = demoMac(); renderMacButton(); if (state.world) syncDevBoxes(macSnap); if (!drM.hidden && !pressing && !strandedHolding()) renderMac(); return; }
   try {
     const q = new URLSearchParams(TOKEN ? { k: TOKEN } : {}); if (!drM.hidden) q.set('open', '1');   // (open: fresh memory footprints)
     const r = await fetch(`/api/sys${String(q) ? `?${q}` : ''}`);
     macSnap = await r.json();
-    renderMacButton(); syncDevBoxes(macSnap);
+    renderMacButton(); if (state.world) syncDevBoxes(macSnap);   // (the dev servers' boxes on the desks: 3D only)
     if (!drM.hidden && !pressing && !strandedHolding()) renderMac();   // (nor while a form is open in "Việc bỏ quên")
   } catch { /* server busy; next poll */ }
 }
@@ -63,10 +63,13 @@ function renderOthers(rows) {
   for (const o of state.limits?.others || []) {
     const ws = liveOf(o), acc = [o.account?.plan, o.account?.org].filter(Boolean).join(' · ');
     const block = acctBlock(o.name, o.label, acc, o.until); rows.append(block);
-    if (!ws.length) { block.append(el('small', 'plan-other-note', o.note || tr('mac.plan.loading'))); continue; }
+    // its sign-in token ran out (an account not used for a while): renewed by one quiet Claude Code run (server/index.mjs refreshLogin)
+    const renew = () => { const b = addButton(tr('mac.plan.renew'), '', () => { b.disabled = true; post('/api/accounts/renew', { name: o.name }); }); b.disabled = !!o.renewing; return b; };
+    if (!ws.length) { block.append(el('small', 'plan-other-note', o.note || tr('mac.plan.loading'))); if (o.expired) block.append(renew()); continue; }
     for (const w of ws) limitRow(block, w);
     // Anthropic not answering for now (it limits how often it's asked): the last reading stays, with when it was read
     if (o.note) block.append(el('small', 'plan-other-note', o.at ? tr('mac.plan.readAt', { time: hhmm(o.at), note: o.note }) : o.note));
+    if (o.expired) block.append(renew());
   }
   if (state.limits?.others?.length) rows.append(autoRow());
   // in the order the user dragged them into (the server's: switching goes down it), the switch after them
@@ -220,6 +223,21 @@ function autoRow() {
     });
     mv.append(cb, el('span', null, tr('mac.plan.autoMove')));
     box.append(mv);
+
+    // then on with it by itself there (server/auto-resume.mjs), under "move" since it only follows one
+    const res = el('label', 'acct-move acct-resume'), rcb = el('input'); rcb.type = 'checkbox'; rcb.checked = a.resume !== false;
+    rcb.addEventListener('change', async () => {
+      rcb.disabled = true;
+      const r = await post('/api/accounts/auto', { resume: rcb.checked });
+      rcb.disabled = false;
+      if (!r.ok) { rcb.checked = !rcb.checked; toast(tr('mac.plan.useFailed')); return; }
+      if (state.limits) state.limits.auto = r;
+      toast(tr(rcb.checked ? 'mac.plan.autoResumeOn' : 'mac.plan.autoResumeOff'), 4000);
+    });
+    res.append(rcb, el('span', null, tr('mac.plan.autoResume')));
+    res.hidden = a.move === false;
+    cb.addEventListener('change', () => { res.hidden = !cb.checked; });
+    box.append(res);
   }
   if (!switchOn()) return box;
   box.append(el('small', 'acct-auto-sub', tr('mac.plan.running')));
@@ -231,7 +249,7 @@ function autoRow() {
 // the server moved the conversations open on an account that ran out
 export function acctMoved(d) {
   if (replay.on || !d.names?.length) return;
-  toast(tr('mac.plan.moved', { from: d.from, to: d.to, n: d.names.length, names: d.names.join(', ') }), 10000);
+  toast(tr(state.limits?.auto?.resume === false ? 'mac.plan.moved' : 'mac.plan.movedResumed', { from: d.from, to: d.to, n: d.names.length, names: d.names.join(', ') }), 10000);
   chatMoved(d.names, d.to);
 }
 // the server moved new sessions to another account (one ran out, or came back)
@@ -451,7 +469,7 @@ function holders(s) {
   if (rest > total * 0.01) shown.push({ key: 'other', name: tr('mac.held.other'), mem: rest, slot: 0 });
   return { total, groups: shown };
 }
-function verdictKey(s) {
+export function verdictKey(s) {
   const swap = s.mem.swapUsed;
   if (s.mem.pressure === 'critical') return swap > GB ? 'critical' : 'squeeze';
   if (s.mem.pressure === 'warn') return swap > GB ? 'swap' : 'squeeze';
@@ -568,6 +586,11 @@ async function setAutoClose(hours) {
     renderMac(); toast(d.hours ? tr('mac.auto.saved', { n: d.hours }) : tr('mac.auto.savedOff'));
   } catch { toast(tr('mac.action.unreachable')); }
 }
+// when a session's process started: the time today, the day too before that
+function opened(ms) {
+  const d = new Date(ms), today = new Date().toDateString() === d.toDateString();
+  return today ? tr('mac.claude.opened', { time: hhmm(ms) }) : tr('mac.claude.openedDay', { day: d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' }), time: hhmm(ms) });
+}
 export function renderMac() {
   const s = macSnap; const body = $('mac-body');
   if (!s?.mem) { body.replaceChildren(el('p', 'muted', tr('mac.measuring'))); return; }
@@ -610,10 +633,14 @@ export function renderMac() {
   const gS = el('div', 'held-group'), sh = el('h4', null, tr('mac.group.sessions')); sh.append(el('small', null, tr('mac.claude.hint'))); gS.append(sh);
   const cl = el('ul', 'rows');
   for (const c of s.claude) {
+    // the conversation's title (its folder's name until Claude Code gives it one), then where and since when it runs
     const li = el('li', 'row'); const main = el('div', 'row-main');
-    const name = el('div', 'row-name', c.name + (c.remote ? ' 📱' : ''));
-    if (idleIds.has(`kill:${c.pid}`)) { li.classList.add('row--suggest'); name.append(el('span', 'row-badge', tr('mac.group.suggest'))); }
-    main.append(name, el('div', 'row-sub', `${c.dir} · ${c.busy ? tr('mac.claude.busy') : tr('mac.claude.idle', { time: fmtAgo(c.idle) })}`));
+    const name = el('div', 'row-name', (c.title || c.name) + (c.remote ? ' 📱' : ''));
+    if (c.you) { li.classList.add('row--you'); name.append(el('span', 'row-badge row-badge--you', tr('mac.claude.you'))); }
+    else if (idleIds.has(`kill:${c.pid}`)) { li.classList.add('row--suggest'); name.append(el('span', 'row-badge', tr('mac.group.suggest'))); }
+    const doing = [c.busy ? tr('mac.claude.busy') : tr('mac.claude.idle', { time: fmtAgo(c.idle) })];
+    if (c.agents) doing.push(tr('mac.claude.agents', { n: c.agents }));
+    main.append(name, el('div', 'row-sub', [c.app, c.start && opened(c.start * 1000), c.dir].filter(Boolean).join(' · ')), el('div', 'row-sub', doing.join(' · ')));
     li.append(main, el('span', 'row-num', fmtBytes(c.mem)), actFor(`kill:${c.pid}`, { action: 'kill', target: c.pid, start: c.start }, tr('common.close'), { disabled: c.busy }));
     cl.append(li);
   }

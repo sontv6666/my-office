@@ -15,6 +15,7 @@ export default {
     yesterday: 'Yesterday',
   },
   topBar: {
+    view: 'View', view3d: 'The 3D office', view2d: 'A plain 2D list of the sessions: light on the machine',
     sampleData: 'sample data',
     plan: 'Claude plan',
     reading: 'reading…',
@@ -63,6 +64,7 @@ export default {
       stream: 'Streamer mode (hides commands and paths)',
       zones: 'Always show area names (default: only on hover)',
       season: 'Seasonal decorations (Halloween, Christmas, Lunar New Year)',
+      drill: 'A fire drill every quarter (15:00, the quarter’s first working day)',
       coach: 'Prompt helper: tips when you write to Claude',
     },
     nightLabel: 'Night',
@@ -117,7 +119,13 @@ export default {
   // the tab bar and sheets on a phone (ui/phone.js)
   phone: {
     tabs: 'Sections',
-    office: 'Office',
+    home: 'Overview',
+    homeNeeds: 'Needs you',
+    homeNothing: 'Nothing needs you right now',
+    homeWorking: 'Working now',
+    homeIdle: '{n} sessions resting, none running',
+    homePlans: 'Plan limits',
+    homeMac: 'Mac',
     sessions: 'Sessions',
     activity: 'Activity',
     approve: 'Approve',
@@ -180,7 +188,7 @@ export default {
   },
   photo: {
     label: 'Photo mode',
-    hint: 'Drag to turn · scroll to zoom · right-drag to move · P or Esc to leave',
+    hint: 'Drag to move · right-drag to turn · scroll to zoom where you point · P or Esc to leave',
     names: 'Names',
     mark: 'Logo',
     sizeTitle: 'Picture size',

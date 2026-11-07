@@ -13,6 +13,7 @@ import { unseenDone } from '../life/your-turn.js';
 import { attentionNow } from './needs-you.js';
 import { whereabouts } from '../people/outings.js';
 import { imageUrl, openImage } from './image-view.js';
+import { renderHome } from './phone-home.js';
 import { t as tr, num } from '../../i18n/index.js';
 
 let feedFilter = 'all';
@@ -120,7 +121,7 @@ let uiQueued = false;
 export function queueUi() {
   if (uiQueued) return; uiQueued = true;
   requestAnimationFrame(() => {
-    uiQueued = false; renderRail(); renderHud(); queueFeed(); state.boardDirty = true; queuePlace(); renderLite();
+    uiQueued = false; renderRail(); renderHud(); queueFeed(); state.boardDirty = true; queuePlace(); renderLite(); renderHome();
     if (state.selectedId) { renderSessionHead(); if (tab === 'subs' && !state.subView) renderSubs(); }
   });
 }

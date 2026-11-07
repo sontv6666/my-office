@@ -15,6 +15,7 @@ export default {
     yesterday: 'Hôm qua',
   },
   topBar: {
+    view: 'Giao diện', view3d: 'Văn phòng 3D', view2d: 'Danh sách phiên 2D: gọn, nhẹ máy',
     sampleData: 'dữ liệu giả lập',
     plan: 'Gói Claude',
     reading: 'đang đọc…',
@@ -63,6 +64,7 @@ export default {
       stream: 'Chế độ quay màn hình (ẩn lệnh, đường dẫn)',
       zones: 'Luôn hiện tên khu vực (mặc định: chỉ khi rê chuột)',
       season: 'Trang trí theo mùa (Halloween, Noel, Tết)',
+      drill: 'Diễn tập PCCC mỗi quý (15:00 ngày làm việc đầu quý)',
       coach: 'Trợ lý soạn prompt: gợi ý khi nhắn cho Claude',
     },
     nightLabel: 'Ban đêm',
@@ -117,7 +119,13 @@ export default {
   // the tab bar and sheets on a phone (ui/phone.js)
   phone: {
     tabs: 'Các mục',
-    office: 'Văn phòng',
+    home: 'Tổng quan',
+    homeNeeds: 'Cần bạn',
+    homeNothing: 'Không có gì cần bạn lúc này',
+    homeWorking: 'Đang làm',
+    homeIdle: '{n} phiên đang nghỉ, không phiên nào đang chạy',
+    homePlans: 'Giới hạn gói',
+    homeMac: 'Máy Mac',
     sessions: 'Phiên',
     activity: 'Hoạt động',
     approve: 'Duyệt',
@@ -180,7 +188,7 @@ export default {
   },
   photo: {
     label: 'Chế độ chụp ảnh',
-    hint: 'Kéo để xoay · cuộn để phóng to · kéo chuột phải để dời · P hoặc Esc để thoát',
+    hint: 'Kéo để dời · kéo chuột phải để xoay · cuộn để phóng to chỗ con trỏ · P hoặc Esc để thoát',
     names: 'Tên',
     mark: 'Logo',
     sizeTitle: 'Cỡ ảnh',

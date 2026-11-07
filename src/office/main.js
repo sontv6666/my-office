@@ -1,5 +1,9 @@
 // Boots the office. Every module's setup() runs once, in this order (the order the page always ran in): the scene,
-// the furniture and people, then the panels, the live connection and the render loop.
+// the furniture and people, then the panels, the live connection and the render loop. A page that opens in the 2D list
+// runs only what the list needs (LIST) and the rest the first time the 3D world is asked for (core/world-boot.js): the
+// world is most of the page's memory, about 1 GB in a browser against about 0.1 GB without it.
+import { state } from './core/state.js';
+import { setWorldBuilder } from './core/world-boot.js';
 import * as coreEnv from './core/env.js';
 import * as uiEventText from './ui/event-text.js';
 import * as uiIcons from './ui/icons.js';
@@ -43,6 +47,7 @@ import * as worldPropsCups from './world/props/cups.js';
 import * as worldPropsDevServers from './world/props/dev-servers.js';
 import * as worldPropsSwitches from './world/props/switches.js';
 import * as worldPropsMicrowave from './world/props/microwave.js';
+import * as worldPropsDutyBoard from './world/props/duty-board.js';
 import * as interactRings from './interact/rings.js';
 import * as peopleNavigation from './people/navigation.js';
 import * as peopleBreaks from './people/breaks.js';
@@ -54,6 +59,7 @@ import * as peopleErrands from './people/errands.js';
 import * as peopleGatherings from './people/gatherings.js';
 import * as peopleOutings from './people/outings.js';
 import * as peopleComnha from './people/comnha.js';
+import * as peopleDuty from './people/duty.js';
 import * as peopleStaff from './people/staff.js';
 import * as peopleTeatime from './people/teatime.js';
 import * as peopleAccountant from './people/accountant.js';
@@ -73,6 +79,9 @@ import * as lifeWeather from './life/weather.js';
 import * as lifeNap from './life/nap.js';
 import * as lifeQuota from './life/quota.js';
 import * as lifeAltar from './life/altar.js';
+import * as lifeLiftService from './life/lift-service.js';
+import * as lifeDrill from './life/drill.js';
+import * as lifeDaySwaps from './life/day-swaps.js';
 import * as lifeTests from './life/tests.js';
 import * as lifePhotostrips from './life/photostrips.js';
 import * as lifePost from './life/post.js';
@@ -84,6 +93,7 @@ import * as uiCameraBar from './ui/camera-bar.js';
 import * as uiNeedsYou from './ui/needs-you.js';
 import * as uiMacDrawer from './ui/mac-drawer.js';
 import * as uiBurn from './ui/burn.js';
+import * as uiVault from './ui/vault.js';
 import * as uiTopbar from './ui/topbar.js';
 import * as interactProps from './interact/props.js';
 import * as interactPlaceChips from './interact/place-chips.js';
@@ -100,10 +110,13 @@ import * as uiTimelapse from './ui/timelapse.js';
 import * as uiGroupChat from './ui/group-chat.js';
 import * as uiGroupChatView from './ui/group-chat-view.js';
 import * as uiStuck from './ui/stuck.js';
+import * as uiMacApprove from './ui/mac-approve.js';
+import * as uiModels from './ui/models.js';
 import * as uiCacheWords from './ui/cache-words.js';
 import * as uiTips from './ui/tips.js';
 import * as interactFirstPerson from './interact/first-person.js';
 import * as netLive from './net/live.js';
+import * as uiTicks from './ui/ticks.js';
 import * as lifeYourTurn from './life/your-turn.js';
 import * as lifeIncidents from './life/incidents.js';
 import * as audioSfx from './audio/sfx.js';
@@ -161,6 +174,7 @@ const MODULES = [
   worldPropsDevServers,
   worldPropsSwitches,
   worldPropsMicrowave,
+  worldPropsDutyBoard,
   interactRings,
   peopleNavigation,
   peopleBreaks,
@@ -173,6 +187,7 @@ const MODULES = [
   peopleOutings,
   peopleComnha,
   peopleStaff,
+  peopleDuty,
   peopleTeatime,
   peopleAccountant,
   peopleRounds,
@@ -191,6 +206,9 @@ const MODULES = [
   lifeNap,
   lifeQuota,
   lifeAltar,
+  lifeLiftService,
+  lifeDrill,
+  lifeDaySwaps,
   lifeTests,
   lifePhotostrips,
   lifePost,
@@ -202,6 +220,7 @@ const MODULES = [
   uiNeedsYou,
   uiMacDrawer,
   uiBurn,
+  uiVault,
   uiTopbar,
   interactProps,
   interactPlaceChips,
@@ -218,10 +237,13 @@ const MODULES = [
   uiGroupChat,
   uiGroupChatView,
   uiStuck,
+  uiMacApprove,
+  uiModels,
   uiCacheWords,
   uiTips,
   interactFirstPerson,
   netLive,
+  { setup: netLive.setupTeams },   // (the teams' name chips over the pods: part of the world)
   lifeYourTurn,
   lifeIncidents,
   audioSfx,
@@ -232,13 +254,32 @@ const MODULES = [
   replayReplay,
   replayTimeline,
   worldBackdropsIndex,
+  uiTicks,
   coreLoop,
   coreOptimize,
 ];
 
+// what the 2D list needs (its rows, the top bar and drawers, the group chat, the live connection or the demo)
+const LIST = new Set([coreEnv, uiEventText, uiIcons, peopleWorkers, uiLite, uiActivity, uiSessionDrawer, uiMacDrawer, uiBurn, uiVault, uiTopbar,
+  interactPlaceCards, uiSettings, uiGroupChat, uiGroupChatView, uiStuck, uiMacApprove, uiModels, uiCacheWords, netLive, lifeYourTurn, audioSfx, uiPermissions,
+  uiPhone, uiNotify, demoDemo, replayReplay, replayTimeline, uiTicks]);
+const done = new Set();
 let started = false;
 export function startOffice() {
   if (started) return;
   started = true;
-  for (const m of MODULES) m.setup();
+  setWorldBuilder(buildWorld);
+  if (!uiLite.listAtStart()) { buildWorld(); return; }
+  for (const m of MODULES) if (LIST.has(m)) { m.setup(); done.add(m); }
+  uiSettings.syncToggles(); uiLite.setLite(true);
+}
+// everything not started yet, in the same order; a list that opened first then seats its sessions (no walking in)
+function buildWorld() {
+  if (state.world) return;
+  state.world = true;
+  const late = done.size > 0;
+  for (const m of MODULES) if (!done.has(m)) { m.setup(); done.add(m); }
+  if (!late) return;
+  for (const s of [...peopleWorkers.sessions.values()]) netLive.upsertSession(s, false);
+  uiMacDrawer.loadMac();
 }

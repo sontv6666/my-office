@@ -63,6 +63,8 @@ export function onEvent(e) {
   if (!e.quiet && e.type !== 'start') addFeed(e);
   const s = sessions.get(e.sess), w = workers.get(e.sess);
   if (state.selectedId === e.sess) scheduleLog();
+  if (s && !e.agent && e.type === 'deploy') toast(tr('incident.deployed', { name: dn(s), label: e.label }));
+  if (s && !e.agent && (e.type === 'wait' || e.type === 'ask')) notifyWait(s, e);   // (both before the person: the 2D list has none)
   if (!w || !s) return;
   if (e.type === 'substart') { spawnSub(w, e.agent, e.label); return; }
   if (e.type === 'substop') { const sw = subs.get(e.agent); if (sw && e.desc) sw.desc = e.desc; dropSub(e.agent); return; }
@@ -88,8 +90,7 @@ export function onEvent(e) {
     a = { station: 'director', anim: 'think', type: 'stop', text: finishLine(fin, done ? tr('incident.report', { task: short(done, 28) }) : tr('incident.finish.report')), e, dwell: 2.4,
       after: () => { if (!director.ack(w)) w.say('stop', tr('incident.reportLeft')); w.push(rest); } };
   }
-  if (e.type === 'deploy') { launchRocket(); toast(tr('incident.deployed', { name: dn(s), label: e.label })); }
-  if (e.type === 'wait' || e.type === 'ask') notifyWait(s, e);
+  if (e.type === 'deploy') launchRocket();
   if (e.type === 'commit') a = postAction(w, a) || a;   // (the letter down to the post box, post.js)
   w.push(e.type === 'compact' ? shredAction(w, a) : a);   // (compaction: the stack to the shredder, shredder.js)
 }

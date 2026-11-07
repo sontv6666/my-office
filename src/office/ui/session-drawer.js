@@ -14,7 +14,11 @@ import { DEMO, demoLog } from '../demo/demo.js';
 import { acctActions } from './session-account.js';
 import { drawDrawerCache } from './cache-words.js';
 import { wardrobePanel } from './wardrobe.js';
+import { pinsLabel, renderPins } from './pins.js';
+import { renderCompose, setupCompose } from './session-compose.js';
+import { openUndo } from './undo-view.js';
 import { t as tr, locale } from '../../i18n/index.js';
+import { modelLong } from '../../shared/model-name.js';
 
 /* ---------- session drawer ---------- */
 export let tab = 'chat';
@@ -35,7 +39,7 @@ export function openSession(id, opts = {}) {
   if (!same) { logItems = []; subItems = []; }
   state.subView = opts.agent || null;
   setTab(opts.tab || 'chat');
-  renderSessionHead(); renderActions();
+  renderSessionHead(); renderActions(); renderCompose();
   loadLog(true);
   queueUi();
 }
@@ -54,6 +58,7 @@ export function renderSessionHead() {
   $('ds-cost').textContent = u ? fmtUsd(u.cost) : '–'; $('ds-cost').parentElement.title = tr('drawer.priceNote');
   const n = s.subs?.length || 0;
   $('tab-subs').textContent = n ? tr('drawer.tabSubsN', { n }) : tr('drawer.tabSubs');
+  pinsLabel(s);
   if (actionsSig(s) !== drawnSig) renderActions();   // (it came to rest, went to work, or moved to another account)
 }
 export async function openWindowOf(s) {
@@ -65,7 +70,7 @@ export async function openWindowOf(s) {
 }
 // what the buttons below depend on
 let drawnSig = '', qrFor = null, wearFor = null;   // (wearFor: the session whose "Đổi đồ" panel is open)   // (qrFor: the session whose Remote Control QR code is shown)
-const actionsSig = (s) => [s.id, s.status === 'rest', s.pid, s.moved?.to, s.acct, state.limits?.others?.length].join('|');
+const actionsSig = (s) => [s.id, s.status === 'rest', s.pid, s.moved?.to, s.acct, state.limits?.others?.length, s.undo?.at, s.undo?.undone, s.undo?.done].join('|');
 function renderActions() {
   const s = sessions.get(state.selectedId); if (!s) return;
   const box = $('ds-actions'); box.replaceChildren(); drawnSig = actionsSig(s);
@@ -80,6 +85,12 @@ function renderActions() {
     box.append(b);
     if (wearFor === s.id) box.append(wardrobePanel(s, renderActions));
   }
+  // the last turn's file changes, put back (server/undo.mjs): once it is over, while it rests
+  if (s.status === 'rest' && s.undo?.done && !s.undo.undone) {
+    const u = el('button', 'btn btn--sm'); u.type = 'button'; u.textContent = tr('drawer.undo.btn'); u.title = tr('drawer.undo.title');
+    // (a view of its own: no tab is selected, so the conversation, drawn again every few seconds, doesn't cover it)
+    u.addEventListener('click', () => { const back = tab; setTab('undo'); openUndo(s, () => setTab(back)); }); box.append(u);
+  }
   box.append(...acctActions(s, renderActions));
   if (s.link) {
     const a = el('a', 'btn btn--primary btn--sm', tr('drawer.openOnClaude')); a.href = s.link; a.target = '_blank'; a.rel = 'noopener';
@@ -92,10 +103,6 @@ function renderActions() {
       if (qrFor === s.id) { const code = el('div', 'qr dr-qr'); try { new window.QRCode(code, { text: s.link, width: 180, height: 180 }); box.append(code, el('p', 'dr-note', tr('drawer.qrNote'))); } catch { /* no QR */ } }
     }
     if (qrFor !== s.id) box.append(el('p', 'dr-note', tr('drawer.openOnClaudeNote')));
-  } else {
-    const [before, after = ''] = tr('drawer.rcHint').split('{cmd}');
-    const p = el('p', 'dr-note'); p.append(before, el('code', null, '/rc'), after);
-    box.append(p);
   }
 }
 // "Close session" for a session that is resting: the same safe stop as the Mac panel (only the process you saw, matched by
@@ -122,9 +129,11 @@ function closeSessionButton(s) {
 }
 function setTab(t) {
   tab = t;
-  for (const [id, name] of [['tab-chat', 'chat'], ['tab-subs', 'subs'], ['tab-act', 'act']]) $(id).setAttribute('aria-selected', String(t === name));
+  for (const [id, name] of [['tab-chat', 'chat'], ['tab-subs', 'subs'], ['tab-act', 'act'], ['tab-pins', 'pins']]) $(id).setAttribute('aria-selected', String(t === name));
   if (t === 'chat') { if (logItems.length) renderChat(true); else $('ds-body').replaceChildren(el('p', 'chat-empty', tr('drawer.loadingChat'))); }
   else if (t === 'subs') renderSubs(true);
+  else if (t === 'pins') renderPins();   // (what you pinned for it: ui/pins.js)
+  else if (t === 'undo') return;   // (ui/undo-view.js draws it)
   else renderActivity();
   queueMicrotask(syncJump);
 }
@@ -354,7 +363,8 @@ export function renderSubs(scrollEnd = false) {
     const b = el('button', 'sub-card'); b.type = 'button';
     const ic = el('span', 'fi-ico'); if (running) ic.dataset.tone = 'blue'; ic.append(icon(running ? 'sparkle' : 'check'));
     const steps = tr('drawer.steps', { n: x.steps || 0 });
-    b.append(ic, el('b', null, `${x.type}${x.desc ? ' · ' + x.desc : ''}`), el('small', null, running ? steps : tr('drawer.doneAt', { time: hhmm(x.endedAt) })),
+    const m = modelLong(x.model);
+    b.append(ic, el('b', null, `${x.type}${x.desc ? ' · ' + x.desc : ''}`), el('small', null, [m, running ? steps : tr('drawer.doneAt', { time: hhmm(x.endedAt) })].filter(Boolean).join(' · ')),
       el('span', null, running ? (x.last ? cap(verb(x.last)) : tr('drawer.starting')) : tr('drawer.subDoneMeta', { steps, time: hhmm(x.startedAt) })));
     b.addEventListener('click', () => { state.subView = x.id; subItems = []; renderSubs(); loadLog(true); });
     return b;
@@ -380,6 +390,7 @@ export function setup() {
   $('tab-chat').addEventListener('click', () => { setTab('chat'); loadLog(true); });
   $('tab-subs').addEventListener('click', () => { state.subView = null; setTab('subs'); });
   $('tab-act').addEventListener('click', () => setTab('act'));
+  $('tab-pins').addEventListener('click', () => setTab('pins'));
   // "Latest" button: shows when you have scrolled up in a conversation.
   jumpBtn = el('button', 'chat-jump');
    jumpBtn.type = 'button';
@@ -387,5 +398,6 @@ export function setup() {
   jumpBtn.append(icon('chevron'), document.createTextNode(tr('drawer.latest')));
   jumpBtn.addEventListener('click', () => { const b = $('ds-body'); b.scrollTo({ top: b.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' }); });
   $('dr-session').append(jumpBtn);
+  setupCompose(drS, () => scheduleLog());   // (a box to write to the session from its page: ui/session-compose.js)
   $('ds-body').addEventListener('scroll', syncJump, { passive: true });
 }

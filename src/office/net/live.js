@@ -9,7 +9,7 @@ import { canvasTex } from '../scene/blocks.js';
 import { DEPTS } from '../world/layout.js';
 import { DEPT_SIGNS } from '../world/pro/wing.js';
 import { lookOf, wearOn } from '../../shared/look.js';
-import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, spawnSub, subs, workers } from '../people/workers.js';
+import { PALETTE, addWorker, dn, dropSub, hash, leaving, leavingIds, sessions, spawnSub, subs, trimLeaving, workers } from '../people/workers.js';
 import { queueUi } from '../ui/activity.js';
 import { closeSession } from '../ui/session-drawer.js';
 import { noteGone, noteStatus } from '../ui/needs-you.js';
@@ -70,6 +70,7 @@ export function freeDesk(id) {
 }
 export let teamTags;
 export function updateTeamTags() {
+  if (!teamTags) return;
   const here = teamTags.map((_, u) => [...sessions.values()].filter((s) => s.desk >= 0 && unitOfDesk[s.desk] === u));
   const nameOf = (u) => rowTeam.get(u) || [...new Set(here[u].map(projOf))][0] || '';
   teamTags.forEach((tg, u) => {
@@ -124,6 +125,8 @@ function reportActivity() {
 if (typeof window !== 'undefined' && !new URLSearchParams(location.search).has('demo')) setInterval(reportActivity, 1000);
 // e: the event this update came with (an 'ev' message), if any
 export function upsertSession(s, walkIn = true, e = null) {
+  // (no 3D yet, the 2D list opened first: no desk and nobody at it; core/world-boot.js seats everyone once it is built)
+  if (!state.world) { s.desk = -1; sessions.set(s.id, s); queueUi(); return; }
   s.desk = proDesk(s);   // (every layout: the project's area)
   reportLook(s);
   const had = sessions.has(s.id), prev = sessions.get(s.id)?.status;
@@ -140,7 +143,7 @@ export function upsertSession(s, walkIn = true, e = null) {
     }
     const live = new Set((s.subs || []).map((x) => x.id));
     for (const [aid, sw] of subs) if (sw.parent === w && !live.has(aid)) dropSub(aid);
-    for (const x of s.subs || []) { if (!subs.has(x.id)) spawnSub(w, x.id, x.type); const sw = subs.get(x.id); if (sw && x.desc) sw.desc = x.desc; }
+    for (const x of s.subs || []) { if (!subs.has(x.id)) spawnSub(w, x.id, x.type); const sw = subs.get(x.id); if (sw && x.desc) sw.desc = x.desc; sw?.setModel(x.model); }
     w.setTeam([...subs.values()].filter((x) => x.parent === w).length);
     w.setAcct(s.acct);
     w.setStuck(s.stuck);
@@ -155,7 +158,7 @@ export function removeSession(id) {
   const s = sessions.get(id); sessions.delete(id); freeDesk(id);
   const w = workers.get(id);
   if (w) {
-    workers.delete(id); leavingIds.add(id); leaving.add(w);
+    workers.delete(id); leavingIds.add(id); leaving.add(w); trimLeaving();
     for (const [aid, sw] of subs) if (sw.parent === w) dropSub(aid, false);   // the boss is leaving: no report
     w.leave(() => leavingIds.delete(id));
   }
@@ -186,6 +189,9 @@ export function setup() {
   /* ---------- live connection ---------- */
   TOKEN = new URLSearchParams(location.search).get('k') || '';
   state.connectedOnce = false;
+}
+// (part of the 3D world: main.js runs it with the world)
+export function setupTeams() {
   // a name chip over each team's pod (a department room: over the gap between its two pods): "Team website-ielts · 3"
   teamTags = UNITS.map((u) => {
     const t = el('div', 'team-tag'); const dot = el('i'), txt = el('span'); t.append(dot, txt);

@@ -5,9 +5,11 @@ import { CHAIR_IDLE, chairs } from '../world/desks.js';
 import { sessions, subs, workers } from '../people/workers.js';
 import { chatAct, chatApply, chatLeft, chatLoad } from '../ui/group-chat.js';
 import { setTrophies } from '../life/trophies.js';
+import { setLiftService } from '../life/lift-service.js';
 import { addFeed, queueFeed, queueUi, renderFeed, toast } from '../ui/activity.js';
 import { closeSession, drM } from '../ui/session-drawer.js';
 import { acctLogin, acctMoved, acctSwitched, limitWarned, liveWindows, loadMac, renderLimits, renderMac } from '../ui/mac-drawer.js';
+import { renderAi, setAi } from '../ui/ai-accounts.js';
 import { DEMO_TODOS, onTodos } from '../ui/whiteboard.js';
 import { TOKEN, freeDesk, removeSession, setConn, upsertSession } from '../net/live.js';
 import { onEvent } from '../life/incidents.js';
@@ -15,6 +17,7 @@ import { onPerm, perms, renderPerms, reportPresence } from '../ui/permissions.js
 import { renderPhone } from '../ui/topbar.js';
 import { summarize } from '../../shared/burn.js';
 import { setTenure } from '../people/farewell.js';
+import { logLine } from './demo-log.js';
 import { t as tr } from '../../i18n/index.js';
 
 export let DEMO;
@@ -42,7 +45,8 @@ function demoProjects() {
   ];
 }
 let demoSeq = 0, demoReleases = 3;
-export const demoLog = new Map(), demoTimers = [];
+export const demoLog = new Map(), demoTimers = new Set();   // (a timer leaves the set when it fires: the demo runs for days)
+const demoLater = (fn, ms) => { const id = setTimeout(() => { demoTimers.delete(id); fn(); }, ms); demoTimers.add(id); };
 function demoEmit(s, type, label = '', extra = {}) {
   const now = Date.now(), e = { id: ++demoSeq, ts: now, sess: s.id, name: s.name, type, label, ...extra };
   if (!extra.agent && !['wait', 'stop', 'substart', 'substop', 'deploy'].includes(type)) s.last = { type, label };
@@ -55,15 +59,14 @@ function demoEmit(s, type, label = '', extra = {}) {
   if (type === 'edit' || type === 'write') state.stats.edit = (state.stats.edit || 0) + 1;
   if (type === 'bash' || type === 'test') state.stats.cmd = (state.stats.cmd || 0) + 1;
   if (type === 'deploy') state.stats.deploy = (state.stats.deploy || 0) + 1;
-  const log = demoLog.get(extra.agent || s.id) || []; demoLog.set(extra.agent || s.id, log);
-  if (type === 'prompt') log.push({ role: 'user', text: label, ts: now });
-  else if (type === 'stop') log.push({ role: 'claude', text: demoReply(demoSeq % REPLY_KEYS.length), ts: now });
-  else if (!['wait', 'substart', 'substop', 'testok', 'testfail', 'commit', 'push'].includes(type)) log.push({ role: 'tool', type: type === 'test' ? 'bash' : type, label, ts: now });
+  logLine(demoLog, extra.agent || s.id, type === 'prompt' ? { role: 'user', text: label, ts: now }
+    : type === 'stop' ? { role: 'claude', text: demoReply(demoSeq % REPLY_KEYS.length), ts: now }
+    : !['wait', 'substart', 'substop', 'testok', 'testfail', 'commit', 'push'].includes(type) ? { role: 'tool', type: type === 'test' ? 'bash' : type, label, ts: now } : null);
   upsertSession({ ...s, subs: s.subs.map((x) => ({ ...x })) });
   onEvent(e);
 }
 function demoRun(s, task, at = 0) {
-  const later = (ms, fn) => demoTimers.push(setTimeout(fn, ms));
+  const later = (ms, fn) => demoLater(fn, ms);
   const step = () => rand(1500, 3200);
   let t = at;
   later(t, () => { s.status = 'work'; s.taskStart = Date.now(); s.lastPrompt = task.prompt; demoEmit(s, 'prompt', task.prompt); });
@@ -77,7 +80,7 @@ function demoRun(s, task, at = 0) {
     }
     if (task.sub && i === 1) {
       const id = `demo-sub-${++demoSeq}`, [kind, desc] = task.sub;
-      later(t, () => { s.subs.push({ id, type: kind, desc, last: null, startedAt: Date.now(), steps: 0 }); demoEmit(s, 'agent', kind, { desc }); demoEmit(s, 'substart', kind, { agent: id, quiet: false }); });
+      later(t, () => { s.subs.push({ id, type: kind, desc, last: null, startedAt: Date.now(), steps: 0, model: 'claude-sonnet-5-5' }); demoEmit(s, 'agent', kind, { desc }); demoEmit(s, 'substart', kind, { agent: id, quiet: false }); });
       for (const [k, l] of [['grep', 'useCart'], ['read', 'src/index.ts'], ['web', desc]]) {
         t += rand(1200, 2200);
         later(t, () => { const x = s.subs.find((y) => y.id === id); if (x) { x.last = { type: k, label: l }; x.steps++; } demoEmit(s, k, l, { agent: id, agentType: kind, quiet: true }); });
@@ -111,7 +114,7 @@ function demoLoop(s, p, first) {
   let k = first ? 0 : Math.floor(Math.random() * p.tasks.length);
   // between tasks a short pause, now and then a long break: long enough to nap, fetch the lunch or pop out to the shop
   // (people/outings.js)
-  const go = (delay) => { const task = p.tasks[k++ % p.tasks.length]; const end = demoRun(s, task, delay); demoTimers.push(setTimeout(() => go(Math.random() < 0.22 ? rand(70000, 150000) : rand(6000, 16000)), end + 50)); };
+  const go = (delay) => { const task = p.tasks[k++ % p.tasks.length]; const end = demoRun(s, task, delay); demoLater(() => go(Math.random() < 0.22 ? rand(70000, 150000) : rand(6000, 16000)), end + 50); };
   go(first ? rand(300, 2500) : rand(4000, 14000));
 }
 const demoAuto = { hours: 0, last: null };
@@ -123,8 +126,9 @@ function demoBattery() {
 }
 export function demoMac() {
   const GBb = 1024 ** 3, now = Math.round(Date.now() / 1000), list = [...sessions.values()];
-  const claude = list.map((s, i) => ({ pid: 52000 + i, start: now - 3600 * (i + 1), name: s.name, dir: s.dir, busy: s.status !== 'rest', idle: s.status === 'rest' ? Math.round((Date.now() - s.lastAt) / 1000) + 3600 * i : 0, mem: (260 + i * 90) * 1024 ** 2, remote: i === 0 }));
   const owner = list.find((s) => s.desk >= 0 && s.name === 'landing-page') || list.find((s) => s.desk >= 0);
+  const claude = list.map((s, i) => ({ pid: 52000 + i, start: now - 3600 * (i + 1), name: s.name, dir: s.dir, busy: s.status !== 'rest', idle: s.status === 'rest' ? Math.round((Date.now() - s.lastAt) / 1000) + 3600 * i : 0, mem: (260 + i * 90) * 1024 ** 2, remote: i === 0,
+    title: tr(`demo.mac.titles.${s.name}`), app: ['VS Code', 'Cursor', 'Terminal', 'VS Code', 'Antigravity IDE', 'Terminal'][i % 6], agents: s.subs?.length || 0, you: s === owner }));
   const dev = { pid: 41001, start: now - 2 * 86400 - 3 * 3600, label: 'next dev', ports: [3000], dir: '~/projects/landing-page', up: 2 * 86400 + 3 * 3600, cpu: 290, mem: 2.3 * GBb,
     owner: owner ? { sid: owner.id, name: owner.name, alive: true } : null };
   const lost = { pid: 41007, start: now - 9 * 3600, label: 'vite', ports: [5173], dir: '~/projects/old-prototype', up: 9 * 3600, cpu: 2, mem: 0.7 * GBb, owner: { sid: 'demo-gone', name: 'old-prototype', alive: false } };
@@ -161,7 +165,7 @@ export function demoBurn(range = 'today') {
       sess[sid] = { m: true, cwd: `~/projects/${name}`, l: at - i * 864e5 - j * 600e3 };
       // a share of the session's cost under one attribution (model, source, agent, skill, plugin, MCP server)
       const put = (share, src, a = '', sk = '', mc = '') => {
-        const key = [model, src, a, sk, sk === 'pdf' ? 'document-skills' : '', mc].join('\t'), v = u * share, was = m[key] || [0, 0, 0, 0, 0, 0];
+        const key = [src === 'subagent' ? 'claude-sonnet-5-5' : model, src, a, sk, sk === 'pdf' ? 'document-skills' : '', mc].join('\t'), v = u * share, was = m[key] || [0, 0, 0, 0, 0, 0];   // (the subagents on Sonnet, as Settings → More sets them)
         m[key] = [was[0] + v, ...[1200, 900, 42000, 3000].map((t, x) => was[x + 1] + Math.round(t * v)), 0];
       };
       put(0.42, 'main'); put(0.06, 'auxiliary');
@@ -211,7 +215,7 @@ export function startDemo() {
   ]);
   state.connectedOnce = true; setConn(true); queueUi();
   // one scripted incident so the red alarm can be seen: three failing commands in a row
-  demoTimers.push(setTimeout(() => { const list = [...sessions.values()]; [0, 1, 2].forEach((k) => setTimeout(() => demoEmit(list[k % list.length], 'fail', tr('demo.incident')), k * 900)); }, 45000));
+  demoLater(() => { const list = [...sessions.values()]; [0, 1, 2].forEach((k) => setTimeout(() => demoEmit(list[k % list.length], 'fail', tr('demo.incident')), k * 900)); }, 45000);
 }
 // One handler for the live stream and for replays. `quiet` (fast-forwarding a replay) places people without walking
 // and fills the feed without bubbles or animations.
@@ -238,7 +242,9 @@ export function applyMsg(d, quiet = false) {
       if (d.build) { if (state.build && d.build !== state.build) reloadSoon(); else state.build = d.build; }   // (the office was updated: this page is an older one)
       state.todos = d.todos || []; onTodos();
       if (d.trophies) setTrophies(d.trophies);
+      if (d.lift) setLiftService(d.lift);   // (the lift's servicing after the server started: life/lift-service.js)
       state.limits = d.limits || null; state.limitsNote = d.limitsNote || ''; for (const w of liveWindows()) if (w.pct >= 80) limitWarned.add(`${w.key}:${w.resetsAt}:${w.pct >= 95 ? 95 : 80}`); renderLimits();
+      setAi(d.ai);   // (Codex's and Antigravity's accounts: ui/ai-accounts.js)
       $('btn-phone').hidden = false; if ($('btn-phone-top')) $('btn-phone-top').hidden = !state.isLocal;   // (on a phone: its PIN, and what the Mac allows it)
       $('btn-bell').hidden = !('Notification' in window) || !window.isSecureContext;
     }
@@ -259,7 +265,8 @@ export function applyMsg(d, quiet = false) {
   else if (d.k === 'acctmove') { if (!quiet) acctMoved(d); }
   else if (d.k === 'chat') chatApply(d);   // (the group chat, the same on every page: server/index.mjs)
   else if (d.k === 'chatact') { if (!quiet) chatAct(d.what); }   // (open conversations moved over too)
-  else if (d.k === 'limits') { state.limits = d.limits || null; state.limitsNote = d.note || ''; renderLimits(); if (!drM.hidden) renderMac(); }
+  else if (d.k === 'limits') { state.limits = d.limits || null; state.limitsNote = d.note || ''; renderLimits(); renderAi(); if (!drM.hidden) renderMac(); }
+  else if (d.k === 'ai') setAi(d.ai);
   else if (d.k === 'sysauto') { if (!quiet) { toast(d.message, 8000); loadMac(); } }   // (idle sessions closed on the drawer's timer)
   else if (d.k === 'trophies') setTrophies(d.t, quiet ? [] : d.earned || []);
   else if (d.k === 'tenure') setTenure(d);   // (the projects' working lives: a farewell due, one back; people/farewell.js)
