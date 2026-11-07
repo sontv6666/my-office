@@ -39,6 +39,7 @@ import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src
 import { createOtel } from './otel.mjs';
 import { applyMydesk, boardFor, createMyDesk } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
+import { poseOf } from '../src/shared/pose.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
 import { pickLang, createT } from '../src/i18n/index.js';
 
@@ -988,8 +989,18 @@ function noteActivity(body) {
   }
   activity = { page: body.page, at: now, items };
 }
-/** { fresh, items: [{ agentId, anim }] }: fresh while a page has reported in the last 5 s. */
-const activityNow = () => ({ fresh: Date.now() - activity.at < 5000, items: activity.items });
+/** { fresh, page, items: [{ agentId, anim }] }: the page's while one has reported in the last 5 s; else each person's
+    pose worked out here from their session (shared/pose.js), so the desk window keeps up with no office page open. */
+function activityNow() {
+  const now = Date.now();
+  if (now - activity.at < 5000) return { fresh: true, page: true, items: activity.items };
+  const items = [];
+  for (const s of sessions.values()) {
+    const aid = agentIdOf(s); if (!aid) continue;
+    items.push({ agentId: aid, anim: poseOf({ status: s.status, last: s.last, lastAt: s.lastEventAt || s.createdAt, doneAt: s.doneAt || 0, bg: s.bg ? [...s.bg.values()] : [] }, now) });
+  }
+  return { fresh: true, page: false, items };
+}
 
 /* ---------- MyDesk's cast (server/mydesk.mjs) ---------- */
 // A session's first hooks can come before MyDesk lists it: kept a minute, replayed when it does.
