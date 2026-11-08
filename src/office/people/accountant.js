@@ -29,7 +29,7 @@ const minutes = () => { const d = officeNow(); return d.getHours() * 60 + d.getM
 const today = () => officeNow().toDateString();
 function say(w, key, vars, ms = 4500) { const text = tr(key, vars); w.say('idle', text); setTimeout(() => { if (w.lastSay?.text === text) w.hush(); }, ms); }
 const usd = (v) => `$${v >= 100 ? Math.round(v) : v.toFixed(2)}`;
-const projOf = (s) => s?.git?.repo || String(s?.dir || '').split('/').filter(Boolean).pop() || tr('activity.live.otherProject');
+const projOf = (s) => s?.git?.repo || String(s?.dir || '').split(/[\\/]/).filter(Boolean).pop() || tr('activity.live.otherProject');
 
 // a moment the office is busy with something together (people/rounds.js waits for these too)
 export function busyNow() {

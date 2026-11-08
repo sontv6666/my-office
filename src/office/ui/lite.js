@@ -22,7 +22,7 @@ export let lite = false;
 let filter = 'all', query = '', head = null, tabs = null, permHost = null, listEl = null, emptyEl = null;
 const GROUPS = ['wait', 'work', 'rest'];
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
-export const project = (s) => s.git?.repo || String(s.dir || '').split('/').filter(Boolean).pop() || '';
+export const project = (s) => s.git?.repo || String(s.dir || '').split(/[\\/]/).filter(Boolean).pop() || '';
 export const statusOf = (s) => (s.status === 'wait' ? 'wait' : s.status === 'rest' ? 'rest' : 'work');
 
 // what it is doing now, in words of the work (not of the office: no lift, no shop)
