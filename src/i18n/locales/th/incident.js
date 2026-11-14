@@ -9,8 +9,8 @@ export default {
   deployed: '🚀 {name} เพิ่ง deploy {label}',
   againFail: 'อีกแล้วเหรอ! {text}',
   report: 'รายงาน: ทำ “{task}” เสร็จแล้ว',
-  reportHidden: 'รายงาน: งานเสร็จแล้ว',
-  reportNoTask: 'รายงาน: เสร็จหมดแล้ว',
+  // a finished turn told with its numbers (life/finish.js): "done · 12 min · 5 file edits"
+  finish: { done: 'เสร็จแล้ว', report: 'รายงาน: เสร็จแล้ว', edits: { one: 'แก้ {n} ไฟล์', other: 'แก้ {n} ไฟล์' } },
   reportLeft: 'วางไว้บนโต๊ะผู้อำนวยการแล้ว',
   turn: {
     done: '{name} ทำเสร็จแล้ว',
