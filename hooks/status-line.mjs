@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createPrefs } from '../server/prefs.mjs';
 import { dataDir } from '../server/data-dir.mjs';
+import { forwardToMyDesk } from './mydesk-status.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.OFFICE_PORT || 4310);
@@ -38,7 +39,10 @@ const chained = prev?.command ? new Promise((resolve) => {
   child.stdin.end(raw);
 }) : Promise.resolve('');
 
-const [, prevOut] = await Promise.all([forward, chained]);
+// (MyDesk too, when it is installed: its plan windows and context meters — hooks/mydesk-status.mjs)
+const toMyDesk = forwardToMyDesk(body);
+
+const [, prevOut] = await Promise.all([forward, chained, toMyDesk]);
 if (prevOut.trim()) { process.stdout.write(prevOut); process.exit(0); }
 const pct = (v) => (typeof v === 'number' ? `${Math.round(v)}%` : null);
 const parts = [d.model?.display_name || 'Claude'];
