@@ -2625,6 +2625,8 @@ const codex = AI_OFF ? null : createCodexAccounts({
 if (!AI_OFF && process.env.OFFICE_AG_RUNS !== '0') watchAntigravity({
   dirs: process.env.OFFICE_AG_DIRS?.split(path.delimiter) || ['antigravity', 'antigravity-ide'].map((d) => path.join(os.homedir(), '.gemini', d, 'conversations')),
   onActive: ({ id, dir, mtime }) => {
+    // linked to MyDesk: MyDesk says who is in (its Antigravity agents come as stand-ins), so no second person here
+    if (mydeskGuards()) return;
     const key = `antigravity:${id}`; let s = sessions.get(key);
     if (!s) {
       s = newSession(key); s.agent = 'gemini'; s.provider = 'antigravity'; s.sid = id; s.outcome = 'unknown';
