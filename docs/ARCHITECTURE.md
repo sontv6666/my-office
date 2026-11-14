@@ -112,7 +112,7 @@ engine switches to demo mode and talks to no API.
 | --- | ---: | --- |
 | `audio/sfx.js` | 75 | Sounds, synthesized in the browser. |
 | `core/env.js` | 73 | Page-wide basics: DOM helpers, the floor plan choice, replay clock, office clock, season, formatting. |
-| `core/loop.js` | 260 | The render loop and its frame budget. |
+| `core/loop.js` | 271 | The render loop and its frame budget. |
 | `core/optimize.js` | 141 | Merging static meshes into fewer draw calls, then starting. |
 | `core/state.js` | 3 | Values that more than one module assigns (the clock, the selection, mode switches…), on one shared object so any module can change them. |
 | `core/world-boot.js` | 8 | The 3D world is built when the page starts, or (the page opened in the 2D list) the first time something asks for it: the 3D view, a replay, a setting of the scene. |
@@ -121,12 +121,13 @@ engine switches to demo mode and talks to no API.
 | `interact/first-person.js` | 263 | First person: walk the office as your own character, and (with the city outside) down the lift and out on the street: the pavements, the zebras (the traffic stops for you), the shops, the bánh mì cart. |
 | `interact/place-cards.js` | 201 | Place cards: what happens at each place. |
 | `interact/place-chips.js` | 182 | Place chips over the furniture and label decluttering. |
-| `interact/props.js` | 284 | Furniture you can point at: highlight, tooltip, click actions. |
+| `interact/props.js` | 286 | Furniture you can point at: highlight, tooltip, click actions. |
 | `interact/rings.js` | 16 | Selection and hover rings on the floor. |
 | `life/altar.js` | 172 | The Thần Tài – Thổ Địa altar in the lobby (company floor), and the offerings on the lunar 1st and 15th. |
 | `life/day-swaps.js` | 39 | Làm bù, nghỉ bù: the office on the Government's swapped days (the dates and their notices: src/shared/workdays.js). |
 | `life/drill.js` | 368 | Diễn tập PCCC: the quarterly fire drill (company floor). |
-| `life/incidents.js` | 95 | Incidents: repeated failures turn the office red. |
+| `life/finish.js` | 46 | A finished turn, told with its real numbers (src/shared/finish.js): each session's turn is followed from its status changes; when it ends, a turn busy for a minute or more gets a bubble like "done · 12 min · 5 file edits" (and, on the company floor, the walk to report to the director: life/incidents.js); a shorter one ends quietly. |
+| `life/incidents.js` | 102 | Incidents: repeated failures turn the office red. |
 | `life/lift-service.js` | 226 | The lift being serviced, right after the office's server starts (server/lift-service.mjs says for how long: three minutes, five on a new build). |
 | `life/nap.js` | 63 | The midday nap, 12:30–13:30: blinds down, the room a little dimmer, everyone resting naps at their desk. |
 | `life/photostrips.js` | 135 | The release history on the whiteboard: each version tag sends four people to the photo booth across the street (people/photobooth.js) and the strip they bring back, four frames of silly poses with the version written under them, is pinned along the bottom of the board's right half. |
@@ -138,7 +139,7 @@ engine switches to demo mode and talks to no API.
 | `life/trophies.js` | 121 | The trophy cabinet and the opening plaque. |
 | `life/weather.js` | 90 | Real weather outside (Open-Meteo). |
 | `life/your-turn.js` | 37 | "Your turn": sessions that finished or wait for you. |
-| `net/live.js` | 157 | The live connection: sessions, desks, teams, events. |
+| `net/live.js` | 205 | The live connection: sessions, desks, teams, events. |
 | `people/accountant.js` | 255 | The accountant (company floor): her desk in the director's office, the day's API cost on her screen, the report to the director at 17:30, and a word with whoever spends the most when the plan's limit gets near. |
 | `people/bedding.js` | 64 | Nap bedding: blanket, pillow, folding it away. |
 | `people/billiards.js` | 484 | Pool in the lounge (company floor; the table: world/props/billiards.js). |
@@ -148,6 +149,7 @@ engine switches to demo mode and talks to no API.
 | `people/comtrua.js` | 172 | Lunch at the quán cơm bình dân across the street (world/backdrops/eat-com.js). |
 | `people/director.js` | 129 | The director: brings each prompt to its desk, receives reports. |
 | `people/duty.js` | 240 | Trực nhật: the pantry's daily chores, a turn each (company floor; the board and the cups at the sink: world/props/duty-board.js; the rota itself: src/shared/duty.js). |
+| `people/envelopes.js` | 54 | Envelopes in the air (src/shared/envelope.js): a subagent being started flies one from its parent to the place it will work, and appears there when it lands; a MyDesk handoff flies one to the session that got it (when MyDesk says so). |
 | `people/errands.js` | 294 | People reacting to what you do in the office: switch off the lamp someone is working by and they get up and switch it back on; print a page and someone fetches it; make a coffee and someone comes for it; the cat on a keyboard gets lifted down; a thirsty plant gets watered; click someone at work and they look up. |
 | `people/evswap.js` | 186 | A battery swap (world/backdrops/street-ev.js). |
 | `people/farewell.js` | 380 | The farewell (tiệc chia tay): a project the office remembers that has had no session for a month (Settings → More: 14, 30, 60 or 90 days, or never; server/tenure.mjs keeps each project's working life and says which are due) gets a last afternoon. |
@@ -168,26 +170,28 @@ engine switches to demo mode and talks to no API.
 | `people/pickle.js` | 193 | Pickleball after work (world/backdrops/street-pickle.js). |
 | `people/rounds.js` | 130 | The director's rounds (company floor): twice a day out of the corner office and round the desks. |
 | `people/staff.js` | 394 | People who work here but aren't sessions: the receptionist, the evening cleaner, a Shopee courier with a parcel. |
-| `people/team-lines.js` | 28 | Dashed lines from a boss to its subagents. |
+| `people/team-lines.js` | 49 | Dashed lines from a boss to its subagents: always there, faint, so whose helper is whose reads at a glance; strong for the boss you selected or point at (or whose helper you point at). |
 | `people/teatime.js` | 91 | Friday 16:00: afternoon tea. |
-| `people/workers.js` | 555 | Workers: one character per session or subagent, what they do and where they walk. |
+| `people/workers.js` | 571 | Workers: one character per session or subagent, what they do and where they walk. |
 | `replay/replay.js` | 164 | Replay and recording. |
 | `replay/timeline.js` | 193 | The timeline: one lane per session. |
 | `scene/blocks.js` | 32 | Building blocks: materials, rounded boxes, cylinders, rugs, canvas textures. |
+| `scene/gl-recovery.js` | 50 | The 3D view losing its WebGL context (the GPU process restarted, a driver reset, too many WebGL views open at once): drawing pauses, the context is asked back after ~1.5 s, and what lived only on the GPU (the environment maps, the shadow map) is made again; after 3 tries the stage says so in plain words, with a way to load the page again. |
 | `scene/lights.js` | 35 | Sun, sky light and the room lamps (per-room night lighting on the company floor). |
 | `scene/quality.js` | 77 | Graphics quality: Auto (the default), Low, Medium or High, each viewer's own choice (Settings → Display). |
-| `scene/renderer.js` | 97 | Renderer, cameras, orbit controls, post-processing and environment light. |
-| `ui/activity.js` | 302 | The activity column and the session list. |
+| `scene/renderer.js` | 108 | Renderer, cameras, orbit controls, post-processing and environment light. |
+| `ui/activity.js` | 306 | The activity column and the session list. |
 | `ui/ai-accounts.js` | 270 | The other AI tools' accounts, in the plan card under Claude's (server/codex-accounts.mjs, antigravity-accounts.mjs): Codex and Antigravity IDE, each with its accounts (usage, the one in use, out until when), adding one, using another, and switching by itself when the one in use runs out. |
+| `ui/bubble-spread.js` | 41 | People's bubbles never cover each other: after the labels are placed, those that overlap on screen move up just clear of the one below (shared/spread.js — learned from Munder Difflin's office). |
 | `ui/burn.js` | 218 | What eats your plan: where Claude Code's usage goes, by model, MCP server, skill, plugin, subagent, project and session. |
 | `ui/cache-words.js` | 53 | How a session's prompt cache reads on screen ("Đồng hồ bộ nhớ đệm", src/shared/cache-clock.js; the cups on the desks are world/props/cups.js): the line under the session drawer's folder, the one under the chat's "Gửi tới" and in its list of conversations, list mode's cards, and the switch in Settings → More for the "about to go cold" notification. |
-| `ui/camera-bar.js` | 58 | The camera toolbar. |
+| `ui/camera-bar.js` | 66 | The camera toolbar. |
 | `ui/chat-avatars.js` | 72 | Round photos for the group chat (group-chat-view.js): each person's own chibi, head and shoulders, drawn once by the office's renderer (the way Settings draws its portraits: same materials, light and tone mapping) and kept as a data URL. |
 | `ui/ci-card.js` | 44 | "Sửa luôn" (server/index.mjs ciCard / ciFix): the card in the group chat when a repository's CI goes red, from the session working in it. |
 | `ui/clip-music.js` | 122 | The clip's music: an original lo-fi loop made right here, nothing borrowed (no samples, no files): a Rhodes-like FM electric piano on Fmaj9 – Em7 – Dm9 – G13, a round bass, a swung boom-bap kit, a soft pentatonic lead, vinyl crackle and a small Schroeder reverb. |
 | `ui/denied-card.js` | 46 | "Hộp lệnh bị chặn" (server/index.mjs onDenied): the card in the group chat for a call auto mode refused: who, what, why. |
 | `ui/event-text.js` | 125 | How events read on screen: actions per event type, verbs, bubble text, streamer mode. |
-| `ui/group-chat-view.js` | 938 | The group chat's window (the conversation: group-chat.js), drawn after the Vietnamese messenger's group chat on a phone (its own web CSS and string table, and a 2026 screenshot of the app, for the colours, sizes and words): the blue gradient bar with the back chevron, the group's name and "👥 N thành viên", call, video and ☰; the pinned message under it; the conversation on a lavender-grey ground, gathered at the bottom like the app's, the others' white bubbles on the left (the name at the top inside the first of a run, the face beside it, the time inside the last), yours pale blue on the right with who has seen it; dark pills for the time lines, white ones for what the group does; "Tin nhắn mới" where you stopped reading; replies quoting what they answer; a recalled message's "Tin nhắn đã được thu hồi"; the ♡ on a bubble's corner and a small pill once someone reacts (hover a bubble for the six, a reply and, on yours, recall); polls and reminders as cards in the middle; "… đang soạn tin"; the input bar: stickers and emoji, "Tin nhắn", ••• (a poll, @ someone), the mic and a photo, or send once you type; writing to Claude, a prompt helper over it. |
+| `ui/group-chat-view.js` | 942 | The group chat's window (the conversation: group-chat.js), drawn after the Vietnamese messenger's group chat on a phone (its own web CSS and string table, and a 2026 screenshot of the app, for the colours, sizes and words): the blue gradient bar with the back chevron, the group's name and "👥 N thành viên", call, video and ☰; the pinned message under it; the conversation on a lavender-grey ground, gathered at the bottom like the app's, the others' white bubbles on the left (the name at the top inside the first of a run, the face beside it, the time inside the last), yours pale blue on the right with who has seen it; dark pills for the time lines, white ones for what the group does; "Tin nhắn mới" where you stopped reading; replies quoting what they answer; a recalled message's "Tin nhắn đã được thu hồi"; the ♡ on a bubble's corner and a small pill once someone reacts (hover a bubble for the six, a reply and, on yours, recall); polls and reminders as cards in the middle; "… đang soạn tin"; the input bar: stickers and emoji, "Tin nhắn", ••• (a poll, @ someone), the mic and a photo, or send once you type; writing to Claude, a prompt helper over it. |
 | `ui/group-chat.js` | 214 | The company group chat, on the page (the window: group-chat-view.js; the people and what they say: src/shared/chat-engine.js). |
 | `ui/icons.js` | 85 | Stroke icons (24 px grid) and the icon helper. |
 | `ui/image-view.js` | 28 | Images in the feed: a session that read, wrote or edited an image gets a thumbnail on that line (activity.js), and a click opens it here, large, over the office (the server serves it by id: GET /api/image). |
@@ -196,6 +200,8 @@ engine switches to demo mode and talks to no API.
 | `ui/mac-approve.js` | 23 | Settings → More: "Approve from the Mac's notifications" (on by default; kept by the server, data/prefs.json). |
 | `ui/mac-drawer.js` | 707 | The Mac drawer: memory, CPU, dev servers, plan limits, cleanup. |
 | `ui/models.js` | 44 | "Model: người điều phối và subagent" (Settings → More; server/models.mjs): the model a Claude session runs on, the one its subagents run on, always that one or only when Claude doesn't pick, and the note asking Claude to split big tasks. |
+| `ui/needs-board.js` | 140 | "Cần bạn / Needs you": a board listing who waits for your approval or an answer, and who finished a turn you have not looked at yet (ui/needs-you.js decides who holds what; src/shared/needs-board.js orders them). |
+| `ui/needs-you.js` | 227 | "Needs you", and what lasts until you look (src/shared/attention.js decides which):   - whoever waits for you gets a calm amber beacon: a soft light column and a floor ring that breathe slowly, and a     chip at the edge of the stage while they are out of view (a click brings the camera to them);   - a session whose turn ended in an error keeps a small red mark over its desk until it works again;   - one that finished and you have not looked at yet keeps a small flag over its desk (MyDesk's `unreviewed` when     MyDesk sends it, else until you open it here). |
 | `ui/notify.js` | 64 | Notifications on this phone (Web Push: server/push.mjs sends them, public/sw.js shows them): Claude's answers in the group chat and an approval waiting, even with the office closed and the phone locked. |
 | `ui/permissions.js` | 160 | Approve / deny cards and Claude's questions. |
 | `ui/phone-home.js` | 114 | "Tổng quan", the home sheet of the phone layout (ui/phone.js): one screen for "what needs me, and how are things". |
@@ -205,17 +211,21 @@ engine switches to demo mode and talks to no API.
 | `ui/portraits.js` | 64 | Portraits of the two character looks for Settings → Characters: two people in each look, drawn by the office's own renderer (same materials, light and tone mapping, so they match what you will see) into a canvas, the first time the tab opens. |
 | `ui/session-account.js` | 54 | "Change account" in a session's drawer (on this computer only): the accounts of the plan card, each with what it has left. |
 | `ui/session-compose.js` | 122 | Writing to a session from its own page: a box under the conversation, the same way as the group chat's "Gửi tới" (POST /api/tasks { sid, text, images, chat: true }; a session at work asks first, then POST /api/tasks/steer). |
-| `ui/session-drawer.js` | 396 | The session drawer: chat, steps, subagents. |
+| `ui/session-drawer.js` | 403 | The session drawer: chat, steps, subagents. |
 | `ui/settings.js` | 126 | Settings popover: backdrop, floor plan, look, time, toggles. |
 | `ui/stranded.js` | 159 | "Việc bỏ quên" in the Mac drawer: the worktrees and checkouts of the repositories the office knows that still hold work (files not committed, commits not pushed, stashes), and worktrees with nothing left in them that could go. |
 | `ui/stuck.js` | 97 | Stuck sessions ("Ngắt vòng lặp kẹt", server/loops.mjs): the card in the group chat (what repeats, Stop, a hint for Claude) and the row in Settings → More (on or off, after how many failures, after how many minutes of spending with nothing edited). |
-| `ui/task-sheet.js` | 98 | "Giao việc": giving Claude work from the group chat (server/tasks.mjs runs it on the Mac). |
+| `ui/task-board-sheet.js` | 110 | The task board, read up close: a click on the wall board opens this sheet — MyDesk's Projects tasks in four columns (to do, doing, review, done), each with who holds it. |
+| `ui/task-board.js` | 210 | MyDesk's Projects tasks on the office wall (company floor: on the library's low wall, facing the desks), and each task in progress pinned as a note at the desk of whoever claimed it (src/shared/task-board.js decides which). |
+| `ui/task-moves.js` | 123 | Task moves acted out on the floor, as Munder Difflin's office plays its ledger (src/shared/task-moves.js decides who moves): MyDesk's board feed says a task was claimed, and the claimant — only while resting — gets up, walks to the task board, takes the note and carries it to their desk; a claimed task going to review or done, they carry it from their desk back to the board. |
+| `ui/task-sheet.js` | 109 | "Giao việc": giving Claude work from the group chat (server/tasks.mjs runs it on the Mac). |
 | `ui/ticks.js` | 25 | The page's clocks, in 2D and 3D alike: the time in the top bar, the open session's header, the Mac's readings. |
 | `ui/timelapse.js` | 156 | A 15-second clip of the office to share: square (1080 × 1080) for a feed or vertical (1080 × 1920) for Reels, TikTok and Shorts, the camera turning slowly round the floor, people at four times their pace, the day running into the evening (a clock in the corner from 8:00 to 23:00, the lights coming on at six), a title at the start and the day's numbers over the last two and a half seconds, with an original lo-fi tune under it (clip-music.js; it can be turned off). |
 | `ui/tips.js` | 115 | The first visit: a short tour of what you can click. |
 | `ui/topbar.js` | 257 | Phone modal, notifications, the night switch. |
 | `ui/undo-view.js` | 55 | "Hoàn tác lượt cuối" (server/undo.mjs): in the session drawer, what undoing the last turn would do to each file, two clicks to do it, then what was done and "Tell Claude" (it doesn't know its files were put back otherwise). |
 | `ui/vault.js` | 165 | "Kho lịch sử" (server/vault.mjs): every conversation's words, kept after Claude Code deletes its transcript (30 days by default). |
+| `ui/wardrobe.js` | 44 | "Đổi đồ": a person's own clothes, picked in the session drawer — shirt, outfit, hair, hair style, accessory, trousers. |
 | `ui/whiteboard.js` | 284 | The whiteboard: agents' tasks and your own sticky notes. |
 | `ui/wrapped.js` | 107 | The week in review: a 1080 × 1350 picture card (the office as it looks right now, then the week's numbers) to save as a PNG or copy, for sharing. |
 | `world/backdrops/beach.js` | 117 | Beach backdrop: sand, surf, palms, umbrellas and loungers. |
@@ -264,7 +274,7 @@ engine switches to demo mode and talks to no API.
 | `world/furniture/rocket.js` | 22 | The deploy rocket on its launch pad. |
 | `world/furniture/room-pieces.js` | 107 | Wall clock, framed art, bookshelf, sofa corner and the globe. |
 | `world/furniture/server-racks.js` | 65 | Server racks with LEDs and fans that follow the Mac's CPU. |
-| `world/layout.js` | 43 | The floor plans (cozy, pro, hq): where the shared furniture stands, and the headquarters wing. |
+| `world/layout.js` | 47 | The floor plans (cozy, pro, hq): where the shared furniture stands, and the headquarters wing. |
 | `world/pro/floor.js` | 347 | The company floor: rooms, partitions and furniture. |
 | `world/pro/pieces.js` | 142 | Company floor building pieces: floor finishes, walls, glass, chairs, dining sets. |
 | `world/pro/wing.js` | 134 | Headquarters' wing: in front of the company floor, a corridor along it, a corridor down the middle and four department rooms of two pods each (the desks, pods' screens and carpets come from the shared code). |
