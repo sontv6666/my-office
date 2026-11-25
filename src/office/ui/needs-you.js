@@ -3,7 +3,10 @@
 //     chip at the edge of the stage while they are out of view (a click brings the camera to them);
 //   - a session whose turn ended in an error keeps a small red mark over its desk until it works again;
 //   - one that finished and you have not looked at yet keeps a small flag over its desk (MyDesk's `unreviewed` when
-//     MyDesk sends it, else until you open it here).
+//     MyDesk sends it, else until you open it here);
+//   - one MyDesk calls quiet (at work, no sign of life for 5 minutes) gets a still grey ring on the floor and its name
+//     tag says for how long, in minutes: nothing is said out loud;
+//   - one running a tool that cannot be undone (MyDesk's `toolWarning`) has a small red dot over its desk while it does.
 // Every one of them comes from the session's status, its events or MyDesk's record; with nobody waiting nothing here
 // moves, and the frame's check is a size test.
 import * as THREE from 'three';
@@ -19,22 +22,25 @@ import { queueUi } from './activity.js';
 import { notifyWait } from './topbar.js';
 import { sfx } from '../audio/sfx.js';
 import { fp } from '../interact/first-person.js';
-import { attentionOf, nextMemory } from '../../shared/attention.js';
+import { attentionOf, nextMemory, quietMinutes } from '../../shared/attention.js';
 import { placeEdgeChips } from '../../shared/spread.js';
 import { t as tr } from '../../i18n/index.js';
 
 const AMBER = new THREE.Color('#F2B33D');
 const memory = new Map();   // session id -> { err, done } (shared/attention.js nextMemory)
-const held = new Map();     // session id -> 'wait' | 'error' | 'review'
+const held = new Map();     // session id -> 'wait' | 'quiet' | 'error' | 'review'
 const beacons = new Map();  // session id -> { g, ring, col }
+const rings = new Map();    // session id -> the quiet one's still grey ring
+const warns = new Map();    // session id -> the small red dot of a tool that cannot be undone
+let quietAt = 0;            // (when the quiet tags' minutes were last written: ms)
 const marks = new Map();    // session id -> { sprite, key }
 const chips = new Map();    // session id -> { b, name, arrow, css }
 let dirty = false, edgeEl = null, chipsAt = 0, colTex = null;
 const markTex = new Map();  // 'error' | 'review:#rrggbb' -> texture
 
-/** What session `id` holds for you now ('wait' | 'error' | 'review' | ''). */
+/** What session `id` holds for you now ('wait' | 'quiet' | 'error' | 'review' | ''). */
 export const attentionNow = (id) => held.get(id) || '';
-/** Everyone holding something for you now: [[session id, 'wait' | 'error' | 'review'], …] (the wall's board, ui/needs-board.js). */
+/** Everyone holding something for you now: [[session id, 'wait' | 'quiet' | 'error' | 'review'], …] (the wall's board, ui/needs-board.js). */
 export const attentionAll = () => [...held];
 
 /** A session update (net/live.js upsertSession): `prev` its status before. fx: a live change (not the first snapshot,
@@ -122,10 +128,39 @@ function chipFor(id) {
   chips.set(id, c);
   return c;
 }
+// the quiet one's ring: grey, on the floor, still (it does not breathe: quiet is not urgent, and the office stays calm)
+function ringFor(id) {
+  let r = rings.get(id);
+  if (r) return r;
+  r = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 48), new THREE.MeshBasicMaterial({ color: '#9AA3B2', transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false }));
+  r.rotation.x = -Math.PI / 2; r.position.y = 0.03; r.userData.dynamic = true; r.visible = false; scene.add(r);
+  rings.set(id, r);
+  return r;
+}
+let warnTex = null;
+function warnFor(id) {
+  let w = warns.get(id);
+  if (w) return w;
+  warnTex ||= canvasTex(32, 32, (g) => { g.beginPath(); g.arc(16, 16, 11, 0, Math.PI * 2); g.fillStyle = '#E5484D'; g.fill(); g.lineWidth = 3; g.strokeStyle = '#1B1F26'; g.stroke(); });
+  w = new THREE.Sprite(new THREE.SpriteMaterial({ map: warnTex, transparent: true, depthWrite: false, toneMapped: false }));
+  w.scale.setScalar(0.16); w.userData.dynamic = true; w.visible = false; scene.add(w);
+  warns.set(id, w);
+  return w;
+}
+// "quiet 7 min" on the name tag: MyDesk's numbers, written again every half minute while it lasts
+function quietTag(w, s, on) {
+  if (!on) { if (w.quietEl) { w.quietEl.hidden = true; w.tagEl.classList.remove('tag--quiet'); } return; }
+  if (!w.quietEl || !w.tagEl.contains(w.quietEl)) { w.quietEl = el('span', 'tag-quiet'); w.tagEl.append(w.quietEl); }
+  const n = quietMinutes(s?.md);
+  w.quietEl.textContent = n == null ? tr('activity.needsYou.quiet') : tr('activity.needsYou.quietFor', { n });
+  w.quietEl.hidden = false; w.tagEl.classList.add('tag--quiet');
+}
 function drop(map, id, off) { const x = map.get(id); if (x) { off(x); map.delete(id); } }
 const dropBeacon = (id) => drop(beacons, id, (b) => { scene.remove(b.g); b.ring.geometry.dispose(); b.ring.material.dispose(); b.col.geometry.dispose(); b.col.material.dispose(); });
 const dropMark = (id) => drop(marks, id, (m) => { scene.remove(m.sprite); m.sprite.material.dispose(); });
 const dropChip = (id) => drop(chips, id, (c) => c.b.remove());
+const dropRing = (id) => drop(rings, id, (r) => { scene.remove(r); r.geometry.dispose(); r.material.dispose(); });
+const dropWarn = (id) => drop(warns, id, (w) => { scene.remove(w); w.material.dispose(); });
 
 /* ---------- each frame ---------- */
 // what everyone holds, worked out again after a change; the pieces made or put away to match
@@ -140,14 +175,20 @@ function sync() {
     if (w) {
       w.tagEl.classList.toggle('tag--err', a === 'error');
       w.tagEl.classList.toggle('tag--review', a === 'review');
+      quietTag(w, s, a === 'quiet');
     }
+    if (s.md?.toolWarning === true && s.status === 'work') warnFor(id); else dropWarn(id);
   }
+  for (const id of [...warns.keys()]) if (!sessions.has(id)) dropWarn(id);
+  quietAt = Date.now();
   for (const id of [...held.keys()]) if (!sessions.has(id)) { held.delete(id); changed = true; }
   for (const id of [...beacons.keys()]) if (held.get(id) !== 'wait') dropBeacon(id);
   for (const id of [...chips.keys()]) if (held.get(id) !== 'wait') dropChip(id);
+  for (const id of [...rings.keys()]) if (held.get(id) !== 'quiet') dropRing(id);
   for (const id of [...marks.keys()]) if (held.get(id) !== 'error' && held.get(id) !== 'review') dropMark(id);
   for (const [id, a] of held) {
     if (a === 'wait') { beaconFor(id); chipFor(id); }
+    else if (a === 'quiet') ringFor(id);
     else markFor(id, a, sessions.get(id)?.md?.projectColor || '#3DDC84');
   }
   if (changed) queueUi();   // (the session list says it too: ui/activity.js doingOf)
@@ -195,7 +236,13 @@ export function updateNeedsYou(t) {
   if (state.selectedId && memory.get(state.selectedId)?.done) {   // opened: looked at
     memory.set(state.selectedId, nextMemory(memory.get(state.selectedId), { seen: true })); dirty = true;
   }
-  if (dirty) sync();
+  if (dirty || (rings.size && Date.now() - quietAt > 30e3)) sync();   // (a quiet tag's minutes: written again every half minute)
+  for (const [id, d] of warns) {   // over the desk, on the other side of the screen from the error mark
+    const s = sessions.get(id), w = workers.get(id), desk = s && s.desk >= 0 ? DESKS[s.desk] : null;
+    if (desk) { const [x, z] = dLocal(desk, -0.5, 0.28); d.position.set(x, 1.12, z); d.visible = true; }
+    else if (w) { d.position.set(w.pos.x + 0.3, 2.3 + w.gy(), w.pos.y); d.visible = w.root.visible; }
+    else d.visible = false;
+  }
   if (!held.size) return;
   // a slow breath (about 2.9 s), held still for reduced motion
   const k = reduceMotion ? 0.6 : 0.5 + 0.5 * Math.sin(t * 2.2);
@@ -207,6 +254,11 @@ export function updateNeedsYou(t) {
     b.g.position.set(w.pos.x, w.gy(), w.pos.y);
     b.ring.material.opacity = 0.35 + 0.35 * k;
     b.col.material.opacity = 0.1 + 0.12 * k;
+  }
+  for (const [id, r] of rings) {   // still: it only goes where they stand
+    const w = workers.get(id), on = !!w && w.root.visible && !fp.on;
+    if (r.visible !== on) r.visible = on;
+    if (on) r.position.set(w.pos.x, w.gy() + 0.03, w.pos.y);
   }
   for (const [id, m] of marks) {   // over the desk (by the screen); someone without a desk: over their head
     const s = sessions.get(id), w = workers.get(id), d = s && s.desk >= 0 ? DESKS[s.desk] : null;

@@ -1,5 +1,6 @@
 // What a person in the office holds for you, until it changes (drawn by src/office/ui/needs-you.js):
 //   'wait'   — waiting for your permission or an answer (its status is wait);
+//   'quiet'  — at work, but MyDesk says it has given no sign of life for 5 minutes (MyDesk's `quiet`), until it does;
 //   'error'  — its turn ended in an error (a StopFailure seen here, or MyDesk's own status 'error'), until it works again;
 //   'review' — done and not looked at yet: MyDesk's `unreviewed` when MyDesk sends it, else finished while this page was
 //              open and not opened since; until it works again or you look;
@@ -21,14 +22,20 @@ export function nextMemory(mem, { e = null, prev, status, seen = false } = {}) {
   return { err, done };
 }
 
-/** -> 'wait' | 'error' | 'review' | '' for a session ({ status, md }: md is MyDesk's record, server/mydesk.mjs mydeskInfo())
-    and the page's memory of it (nextMemory()). */
+/** -> 'wait' | 'quiet' | 'error' | 'review' | '' for a session ({ status, md }: md is MyDesk's record, server/mydesk.mjs
+    mydeskInfo()) and the page's memory of it (nextMemory()). */
 export function attentionOf(s, mem) {
   if (!s) return '';
   if (s.status === 'wait') return 'wait';
-  if (s.status !== 'rest') return '';
   const md = s.md && typeof s.md === 'object' ? s.md : null;
-  if (md?.state === 'error' || mem?.err) return 'error';
+  if (s.status !== 'rest') return md?.quiet === true ? 'quiet' : '';
+  if (md?.state === 'error' || md?.stopKind || mem?.err) return 'error';   // (MyDesk's stopError: the turn ended on an API error)
   if (md && typeof md.unreviewed === 'boolean') return md.unreviewed ? 'review' : '';   // (MyDesk knows whether you looked)
   return mem?.done ? 'review' : '';
+}
+
+/** How long a quiet one has been quiet, in whole minutes (md.quietSince: MyDesk's `quiet.since`), or null. */
+export function quietMinutes(md, now = Date.now()) {
+  const since = md && md.quiet === true ? Number(md.quietSince) : NaN;
+  return Number.isFinite(since) && since > 0 ? Math.max(0, Math.floor((now - since) / 60e3)) : null;
 }

@@ -1,4 +1,5 @@
-// "Cần bạn / Needs you": a board listing who waits for your approval or an answer, and who finished a turn you have
+// "Cần bạn / Needs you": a board listing who waits for your approval or an answer, whose turn ended on an error (why, from
+// MyDesk's stopError when it sends one), who MyDesk calls quiet (for how many minutes), and who finished a turn you have
 // not looked at yet (ui/needs-you.js decides who holds what; src/shared/needs-board.js orders them). The 3D counterpart
 // of MyDesk's 2D board. Flush on a wall that faces the default camera, as the whiteboard and the task board are: on the
 // company floor on the dev floor's side of the lobby's low wall, between the server room's glass and the glass doors;
@@ -17,9 +18,10 @@ import { addProp } from '../interact/props.js';
 import { attentionAll } from './needs-you.js';
 import { showPerson } from './camera-bar.js';
 import { openSession } from './session-drawer.js';
-import { toast } from './activity.js';
+import { stopWhy, toast } from './activity.js';
 import { fp } from '../interact/first-person.js';
 import { boardGlow, needsBoard } from '../../shared/needs-board.js';
+import { quietMinutes } from '../../shared/attention.js';
 import { t as tr } from '../../i18n/index.js';
 
 const CW = 640, CH = 520;   // the face's canvas in pixels (its size in metres: LAY.needs, width; height to match)
@@ -32,10 +34,18 @@ const LIT = 0.35, DIM = 0.12;   // the face's own light: lit while somebody is o
 const ROWS = 3;
 let board = needsBoard([], ROWS), sig = null, checkedAt = -1;
 
+// why each one is on the board, in a few words: the numbers and MyDesk's reason when there are some
+function whyOf(attention, s) {
+  if (attention === 'wait') return tr('activity.needsBoard.wait');
+  if (attention === 'quiet') { const n = quietMinutes(s?.md); return n == null ? tr('activity.needsBoard.quietNow') : tr('activity.needsBoard.quiet', { n }); }
+  if (attention === 'error') { const why = stopWhy(s?.md?.stopKind); return why ? tr('activity.needsBoard.errorWhy', { why }) : tr('activity.needsBoard.error'); }
+  return tr('activity.needsBoard.review');
+}
 function listNow() {
   return attentionAll().map(([id, attention]) => {
     const s = sessions.get(id);
-    return { id, attention, since: attention === 'review' ? s?.doneAt || s?.lastAt || 0 : s?.lastAt || 0, name: s ? dn(s) : '', color: s?.md?.projectColor || (s ? colorOf(s) : '#3DDC84') };
+    const since = attention === 'review' || attention === 'error' ? s?.doneAt || s?.lastAt || 0 : attention === 'quiet' ? s?.md?.quietSince || s?.lastAt || 0 : s?.lastAt || 0;
+    return { id, attention, since, name: s ? dn(s) : '', why: whyOf(attention, s), color: s?.md?.projectColor || (s ? colorOf(s) : '#3DDC84') };
   });
 }
 function fit(g, text, max) {
@@ -81,12 +91,12 @@ function draw() {
     const block = (n - 1) * RH + 76 + (more > 0 ? 48 : 0), y0 = Math.max(top + 18, mid - block / 2 + 18);   // (y0: the first name's middle; a row's ink starts 18 px above it)
     b.items.forEach((x, i) => {
       const y = y0 + i * RH, wait = x.attention === 'wait';   // y: the name's line; why, 44 px under it
-      g.fillStyle = wait ? AMBER : x.color; g.beginPath(); g.arc(X + 14, y, 14, 0, Math.PI * 2); g.fill();
+      g.fillStyle = wait ? AMBER : x.attention === 'error' ? '#E5484D' : x.attention === 'quiet' ? '#9AA3B2' : x.color; g.beginPath(); g.arc(X + 14, y, 14, 0, Math.PI * 2); g.fill();
       if (wait) { g.fillStyle = '#FFFFFF'; g.font = `900 21px ${FB}`; g.textAlign = 'center'; g.fillText('!', X + 14, y + 1); g.textAlign = 'left'; }
       g.fillStyle = '#22304A';
       g.fillText(sized(g, state.streamer ? tr('common.session') : x.name, TW, 800, [36, 33, 30]), TX, y);
-      g.fillStyle = wait ? '#A85F0C' : '#4F5B70';
-      g.fillText(sized(g, tr(wait ? 'activity.needsBoard.wait' : 'activity.needsBoard.review'), TW, 600, [28, 25, 22]), TX, y + 44);
+      g.fillStyle = wait ? '#A85F0C' : x.attention === 'error' ? '#B4373B' : '#4F5B70';
+      g.fillText(sized(g, x.why, TW, 600, [28, 25, 22]), TX, y + 44);
     });
     if (more > 0) { g.fillStyle = '#6B7486'; g.font = `700 26px ${FB}`; g.fillText(tr('board.more', { n: more }), TX, y0 + (n - 1) * RH + 44 + 52); }
   }
@@ -100,7 +110,7 @@ export function updateNeedsBoard(t) {
   if (!group) return;
   if (t - checkedAt > 0.5 || t < checkedAt) {
     checkedAt = t;
-    const next = needsBoard(listNow(), ROWS), key = JSON.stringify([state.streamer, next.count, next.items.map((x) => [x.id, x.attention, x.name, x.color])]);
+    const next = needsBoard(listNow(), ROWS), key = JSON.stringify([state.streamer, next.count, next.items.map((x) => [x.id, x.attention, x.name, x.color, x.why])]);
     board = next;
     if (key !== sig) { sig = key; draw(); }
   }

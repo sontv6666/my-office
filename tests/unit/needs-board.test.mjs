@@ -2,18 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { boardGlow, needsBoard } from '../../src/shared/needs-board.js';
 
-test('counts who waits for you and who finished unread; errors and the rest are not on it', () => {
+test('counts who waits for you, who stopped on an error, who is quiet and who finished unread; the rest are not on it', () => {
   const b = needsBoard([
     { id: 'a', attention: 'review', since: 10 },
     { id: 'b', attention: 'wait', since: 50 },
     { id: 'c', attention: 'error', since: 1 },
     { id: 'd', attention: '', since: 1 },
     { id: 'e', attention: 'wait', since: 20 },
-  ]);
-  assert.equal(b.count, 3);
-  assert.equal(b.wait, 2);
-  assert.equal(b.review, 1);
-  assert.deepEqual(b.items.map((x) => x.id), ['e', 'b', 'a'], 'waiting first, the longest-waiting first');
+    { id: 'f', attention: 'quiet', since: 5 },
+    { id: 'g', attention: 'toString', since: 0 },
+  ], 9);
+  assert.equal(b.count, 5);
+  assert.deepEqual([b.wait, b.error, b.quiet, b.review], [2, 1, 1, 1]);
+  assert.deepEqual(b.items.map((x) => x.id), ['e', 'b', 'c', 'f', 'a'], 'waiting first, then an error, then quiet, then unread; the longest first');
   assert.equal(b.first.id, 'e', 'a click goes to the one waiting longest');
 });
 

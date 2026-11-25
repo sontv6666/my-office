@@ -5,7 +5,7 @@ import { STATUS_LABEL, verb } from './event-text.js';
 import { TYPE_ICON, icon } from './icons.js';
 import { BASE_ZOOM } from '../scene/renderer.js';
 import { colorOf, dn, sessions, workers } from '../people/workers.js';
-import { cap, feedRow, fmtTok, fmtUsd, openFromRow, queueUi, toast } from './activity.js';
+import { cap, feedRow, fmtTok, fmtUsd, heldWords, openFromRow, queueUi, toast } from './activity.js';
 import { goView, setView } from './camera-bar.js';
 import { closeMac, doAction, loadMac, macSnap } from './mac-drawer.js';
 import { TOKEN } from '../net/live.js';
@@ -19,6 +19,7 @@ import { renderCompose, setupCompose } from './session-compose.js';
 import { openUndo } from './undo-view.js';
 import { t as tr, locale } from '../../i18n/index.js';
 import { modelLong } from '../../shared/model-name.js';
+import { attentionNow } from './needs-you.js';
 
 /* ---------- session drawer ---------- */
 export let tab = 'chat';
@@ -50,6 +51,9 @@ export function renderSessionHead() {
   $('ds-name').textContent = dn(s);
   $('ds-dir').textContent = s.origin ? `${s.dir} · ${s.origin}` : s.dir;
   drawDrawerCache();   // (its prompt cache: warm for how long, or cold)
+  // why it needs you, when MyDesk says more than the status does: quiet for how long, the error its turn ended on
+  { const held = attentionNow(s.id), why = $('ds-why');
+    if (why) { const on = held === 'quiet' || held === 'error'; why.hidden = !on; why.textContent = on ? heldWords(s, held) : ''; why.dataset.held = on ? held : ''; } }
   const st = $('ds-status'); st.textContent = STATUS_LABEL[s.status]; st.dataset.status = s.status;
   $('ds-read').textContent = s.counts?.read ?? 0; $('ds-edit').textContent = s.counts?.edit ?? 0; $('ds-cmd').textContent = s.counts?.cmd ?? 0;
   $('ds-time').textContent = s.taskStart && s.status !== 'rest' ? fmtClock((nowMs() - s.taskStart) / 1000) : '–';
@@ -70,7 +74,7 @@ export async function openWindowOf(s) {
 }
 // what the buttons below depend on
 let drawnSig = '', qrFor = null, wearFor = null;   // (wearFor: the session whose "Đổi đồ" panel is open)   // (qrFor: the session whose Remote Control QR code is shown)
-const actionsSig = (s) => [s.id, s.status === 'rest', s.pid, s.moved?.to, s.acct, state.limits?.others?.length, s.undo?.at, s.undo?.undone, s.undo?.done].join('|');
+const actionsSig = (s) => [s.id, s.status === 'rest', s.pid, s.moved?.to, s.acct, state.limits?.others?.length, s.undo?.at, s.undo?.undone, s.undo?.done, s.md?.id].join('|');
 function renderActions() {
   const s = sessions.get(state.selectedId); if (!s) return;
   const box = $('ds-actions'); box.replaceChildren(); drawnSig = actionsSig(s);
@@ -79,6 +83,13 @@ function renderActions() {
     b.title = tr('drawer.openWindowTitle'); b.addEventListener('click', () => openWindowOf(s)); box.append(b);
   }
   if (state.isLocal && s.pid && s.status === 'rest') box.append(closeSessionButton(s));
+  // linked to MyDesk: its Inspector for this agent — approving, answering and messaging go through MyDesk, also for a
+  // session in an Orca tab the office cannot type into (server/index.mjs /api/mydesk/open)
+  if (state.isLocal && !DEMO && s.md?.id) {
+    const b = el('button', 'btn btn--sm', tr('drawer.openInMyDesk')); b.type = 'button'; b.title = tr('drawer.openInMyDeskTitle');
+    b.addEventListener('click', () => openInMyDesk(s));
+    box.append(b);
+  }
   if (state.isLocal && !DEMO) {   // "Đổi đồ": the person's own clothes (ui/wardrobe.js)
     const b = el('button', 'btn btn--sm', tr('drawer.wear.open')); b.type = 'button'; b.title = tr('drawer.wear.title'); b.setAttribute('aria-pressed', String(wearFor === s.id));
     b.addEventListener('click', () => { wearFor = wearFor === s.id ? null : s.id; renderActions(); });
@@ -104,6 +115,12 @@ function renderActions() {
     }
     if (qrFor !== s.id) box.append(el('p', 'dr-note', tr('drawer.openOnClaudeNote')));
   }
+}
+async function openInMyDesk(s) {
+  try {
+    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sess: s.id }) });
+    if (!(r.ok && (await r.json()).ok)) toast(tr('drawer.openInMyDeskFailed'), 4000);
+  } catch { toast(tr('drawer.openInMyDeskFailed'), 4000); }
 }
 // "Close session" for a session that is resting: the same safe stop as the Mac panel (only the process you saw, matched by
 // its start time; never one that is working). Two clicks, so a stray click closes nothing. The conversation stays on

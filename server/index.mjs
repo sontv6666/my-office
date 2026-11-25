@@ -48,7 +48,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { applyMydesk, boardFor, createMyDesk } from './mydesk.mjs';
+import { applyMydesk, boardFor, createMyDesk, langFrom, mydeskHash } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { poseOf } from '../src/shared/pose.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
@@ -252,7 +252,8 @@ const sidToKey = new Map();
 // While MyDesk lists the sessions, it owns "undo last turn" and the shared-file / port notes (learned from this very
 // office); a second copy here would tell Claude twice. MyDesk gone (3 failed reads) -> the office does them again.
 const mydeskGuards = () => mydesk.status().linked;
-const mydesk = createMyDesk({ dataDir: DATA_DIR, onChange: (cast) => { syncCast(cast).catch((err) => console.error('mydesk', err)); } });
+// (own: a Claude session the office has itself — a teammate flag from MyDesk never drops it, server/mydesk.mjs castOf)
+const mydesk = createMyDesk({ dataDir: DATA_DIR, onChange: (cast) => { syncCast(cast).catch((err) => console.error('mydesk', err)); }, own: (sid) => !!bySid(sid) });
 let feed = [];
 let seq = 0;
 const today = () => new Date().toLocaleDateString('sv-SE');
@@ -924,6 +925,7 @@ async function doScan() {
     }
     if (j.sessionId && s.sid !== j.sessionId) { if (s.sid) sidToKey.delete(s.sid); s.sid = j.sessionId; changed = true; }
     if (j.sessionId) sidToKey.set(j.sessionId, key);
+    if (j.sessionId && applyMydesk(s, mydesk.md(j.sessionId))) changed = true;   // (found between two of MyDesk's changes: its record now)
     const link = j.bridgeSessionId ? 'https://claude.ai/code/' + j.bridgeSessionId : null;
     const name = j.name || base(j.cwd) || 'claude';
     if (s.name !== name || s.cwd !== j.cwd || s.link !== link) { s.name = name; s.cwd = j.cwd || ''; s.link = link; changed = true; noteDir(s.cwd); }
@@ -1114,7 +1116,8 @@ function upsertExternal(x) {
   let s = sessions.get(key);
   if (!s) { s = newSession(key); s.external = true; s.agent = x.agent; sessions.set(key, s); }
   const last = x.tool ? { type: classify(x.tool).type, label: clip(redact(oneLine(x.tool)), 40) } : null;   // (MyDesk sends the tool's name only)
-  if (s.name === x.name && s.cwd === x.cwd && s.status === x.status && JSON.stringify(s.last) === JSON.stringify(last)) return;
+  const mdNew = applyMydesk(s, x.md);   // (a stand-in made just now: syncCast laid the records on before it was here)
+  if (!mdNew && s.name === x.name && s.cwd === x.cwd && s.status === x.status && JSON.stringify(s.last) === JSON.stringify(last)) return;
   if (x.status === 'work' && s.status !== 'work') s.taskStart = now;
   if (x.status === 'rest' && s.status !== 'rest') { s.doneAt = now; s.taskStart = 0; }
   s.name = x.name; s.cwd = x.cwd; s.status = x.status; s.last = last; s.lastEventAt = now;
@@ -1186,6 +1189,7 @@ async function onHook(p) {
     s.sid = sid; s.cwd = p.cwd || ''; s.name = `${base(p.cwd) || 'claude'}-${sid.slice(0, 2)}`; noteDir(s.cwd);
     sessions.set(key, s); sidToKey.set(sid, key);
     dropStandIn(sid);
+    applyMydesk(s, mydesk.md(sid));   // (MyDesk's record of it, at once: not only at MyDesk's next change)
     broadcast({ k: 'sess', s: pub(s) });
   }
   const now = Date.now();
@@ -2815,14 +2819,17 @@ const server = http.createServer((req, res) => {
   }
   // MyDesk's Projects board for the office wall (ui/task-board.js): its tasks, each claim turned into the office's own
   // session id; { ok: false } when there is none (not linked, MyDesk gone, its projects not set up). This computer only.
-  // a task clicked in the board sheet (ui/task-board-sheet.js): MyDesk opens it in its Projects page
+  // a task clicked in the board sheet (ui/task-board-sheet.js): MyDesk opens it — its Work page while someone holds
+  // it, else its Projects page; a person's "Open in MyDesk" (ui/session-drawer.js), { sess }: MyDesk's Inspector for
+  // that agent, by the id MyDesk itself gave it (its record on the session, never an id from the page)
   if (url.pathname === '/api/mydesk/open' && req.method === 'POST') {
     if (!isLoopback(req) || !sameOriginOf(req) || !String(req.headers['content-type'] || '').startsWith('application/json')) { json(res, 403, { ok: false }); return; }
     readJson(req).then(async (b) => {
-      const id = (v) => (typeof v === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(v) ? v : '');
-      const p = id(b?.projectId), t = id(b?.taskId);
-      if (!p) { json(res, 400, { ok: false }); return; }
-      json(res, 200, { ok: await mydesk.open(`#/projects/${p}${t ? `?task=${t}` : ''}`) });
+      const s = typeof b?.sess === 'string' ? [...sessions.values()].find((x) => x.id === b.sess) : null;
+      const hash = b?.sess !== undefined ? mydeskHash({ agentId: s?.md?.id ?? null })
+        : mydeskHash({ projectId: b?.projectId, taskId: b?.taskId, claimed: mydesk.claimed(b?.taskId) });
+      if (!hash) { json(res, b?.sess !== undefined && !s ? 404 : 400, { ok: false }); return; }
+      json(res, 200, { ok: await mydesk.open(hash) });
     });
     return;
   }
@@ -2844,7 +2851,11 @@ const server = http.createServer((req, res) => {
       let body = {};
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
       const ok = mydesk.link(body.url);
-      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok, ...mydesk.status() }));
+      // MyDesk's language (its EN | VI switch) comes with the link, and again when you switch it: the office speaks it
+      // too, and every open page without a ?lang= of its own reloads in it (as a switch in the office's Settings does)
+      const lang = ok ? langFrom(body, prefs.lang()) : '';
+      if (lang && prefs.setLang(lang)) broadcast({ k: 'lang', lang: prefs.lang() });
+      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok, lang: prefs.lang(), ...mydesk.status() }));
     });
     return;
   }

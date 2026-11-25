@@ -10,8 +10,33 @@
 //   - MyDesk not answering 3 times in a row (it was closed): the office goes back to showing every session it finds.
 import fs from 'node:fs';
 import path from 'node:path';
+import { LANGS } from '../src/i18n/index.js';
 
 const FAILS_TO_UNLINK = 3;
+
+/** The language MyDesk sends with its link ({ url, lang }: its EN | VI switch) -> the language the office should switch
+    to, or '' when none is asked for, the office does not speak it, or it speaks it already (`now`). */
+export function langFrom(body, now) {
+  const l = body && typeof body.lang === 'string' ? body.lang : '';
+  return l && Object.hasOwn(LANGS, l) && l !== now ? l : '';
+}
+
+// MyDesk's ids as a link may carry them: a Claude session's uuid, another CLI's '<provider>:<id>' (Antigravity, Codex…)
+const AGENT_ID = /^[A-Za-z0-9_:-]{1,160}$/, PLAIN_ID = /^[A-Za-z0-9_-]{1,80}$/;
+/** The MyDesk page a click in the office opens (POST <url>/api/navigate; MyDesk's own check takes exactly these):
+    - a person, { agentId }: '#/agents/3d?inspect=<id>', MyDesk's Inspector for that agent (approve, answer, send
+      a message there), the ':' of another CLI's id encoded;
+    - a task, { projectId, taskId, claimed }: '#/work/<taskId>' while someone holds it (the task and its agent on one
+      screen), else '#/projects/<projectId>?task=<taskId>' (or the project alone);
+    -> '' when an id is not one MyDesk takes. */
+export function mydeskHash({ agentId, projectId, taskId, claimed = false } = {}) {
+  if (agentId !== undefined) return typeof agentId === 'string' && AGENT_ID.test(agentId) ? `#/agents/3d?inspect=${encodeURIComponent(agentId)}` : '';
+  const id = (v) => (typeof v === 'string' && PLAIN_ID.test(v) ? v : '');
+  const p = id(projectId), t = id(taskId);
+  if (!p) return '';
+  if (t && claimed) return `#/work/${t}`;
+  return `#/projects/${p}${t ? `?task=${t}` : ''}`;
+}
 
 /** MyDesk's status -> the office's three. */
 // (MyDesk's 'waiting' is a turn that ended — the CLI waits for your NEXT prompt, nothing to approve: it rests here.
@@ -32,20 +57,31 @@ export function agentTag(providerId) {
 }
 
 /** What MyDesk knows of an agent beyond the office's three statuses, kept with its record (`md`):
+    - id: MyDesk's own id of the agent (its Inspector opens by it: mydeskHash()), or null when a link cannot carry it;
     - state: MyDesk's own status (working, thinking, waiting, help, completed, error, idle): an error is not a rest;
     - unreviewed: it finished and you have not looked at it in MyDesk yet;
     - parentId: the session it works for (MyDesk's metadata.parentId), or null;
     - toolWarning: the tool it is running cannot be undone (MyDesk's irreversible-tool check);
-    - projectColor: MyDesk's colour for its project ('#rrggbb'), or null. */
+    - projectColor: MyDesk's colour for its project ('#rrggbb'), or null;
+    - quiet, quietSince: MyDesk's `quiet` — Thinking for 5 minutes with no sign of life — and since when (ms), else
+      false and null;
+    - stopKind: the kind of API error its last turn ended on (MyDesk's stopError.kind: rate_limit, overloaded,
+      authentication_failed…; 'unknown' for one it could not name), or null. */
 export function mydeskInfo(a) {
   const st = String(a?.status || '');
   const color = String(a?.projectColor || '');
+  const id = String(a?.id ?? '');
+  const since = Number(a?.quiet?.since), kind = String(a?.stopError?.kind || '');
   return {
+    id: AGENT_ID.test(id) ? id : null,
     state: /^[a-z_]{1,24}$/.test(st) ? st : 'idle',
     unreviewed: !!a?.unreviewed,
     parentId: a?.metadata?.parentId ? String(a.metadata.parentId) : null,
     toolWarning: !!a?.toolWarning,
     projectColor: /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null,
+    quiet: !!a?.quiet,
+    quietSince: a?.quiet && Number.isFinite(since) && since > 0 ? since : null,
+    stopKind: a?.stopError ? (/^[a-z_]{1,40}$/.test(kind) ? kind : 'unknown') : null,
   };
 }
 
@@ -60,14 +96,17 @@ export function applyMydesk(s, md) {
 
 /** /api/agents -> who is in: { claude: Set(sessionId), external: [{ id, name, cwd, status, agent, tool, md }] } — external holds
     every agent's record (agent '' for Claude Code), the stand-in when the office has no session of its own; md is
-    mydeskInfo(). Subagents are left out. */
-export function castOf(list) {
+    mydeskInfo(). Subagents are left out, and so are an agent team's teammates — unless MyDesk flags one the office
+    has as a Claude session of its own (`own(sessionId)`): that is a session at work here (a team's lead, which an
+    older MyDesk flagged by the lead's session id on the team's TeammateIdle), never dropped for the flag. */
+export function castOf(list, { own = () => false } = {}) {
   const claude = new Set(), external = [];
   for (const a of Array.isArray(list) ? list : []) {
-    if (!a || typeof a !== 'object' || a.metadata?.isSubagent || a.metadata?.isTeammate) continue;
+    if (!a || typeof a !== 'object' || a.metadata?.isSubagent) continue;
     const id = String(a.sessionId || a.id || '');
     if (!id) continue;
     const tag = agentTag(a.providerId);
+    if (a.metadata?.isTeammate && (tag || !own(id))) continue;
     if (!tag) claude.add(id);
     external.push({
       id, name: String(a.name || tag || 'claude'), cwd: String(a.metadata?.projectPath || ''), status: officeStatus(a.status), agent: tag,
@@ -138,15 +177,18 @@ export function taskMove(e, known = { claimants: new Map(), statuses: new Map(),
 }
 
 /**
- * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env }) -> { link(url), allows(sid), cast(), status(), poll(), md(id), board() }.
- * board() is MyDesk's Projects board as it sends it (boardFor() makes it the wall's), null when there is none.
+ * createMyDesk({ dataDir, onChange(cast|null), fetchImpl, env, own(sid) }) -> { link(url), allows(sid), cast(), status(), poll(), md(id),
+ * board(), claimed(taskId), open(hash) }.
+ * own(sid): the office has that Claude session itself (castOf(): a teammate flag never drops it).
+ * board() is MyDesk's Projects board as it sends it (boardFor() makes it the wall's), null when there is none;
+ * claimed(taskId) says whether someone held that task at the board's last read (mydeskHash(): its Work page).
  * cast() is null while not linked (or MyDesk is gone): then every session is allowed.
  * md(agentId) is MyDesk's record of that agent (mydeskInfo()), null when it has none. The server lays it on its sessions
  * when the cast changes and sends it to the page with each session:
  *   syncCast():  for (const s of sessions.values()) if (applyMydesk(s, mydesk.md(agentIdOf(s)))) broadcast({ k: 'sess', s: pub(s) });
  *   pub(s):      md: s.md || null
  */
-export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, env = process.env, everyMs = 2000 } = {}) {
+export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, env = process.env, everyMs = 2000, own = () => false } = {}) {
   const FILE = path.join(dataDir, 'mydesk.json');
   let url = '', cast = null, fails = 0, inflight = null;
 
@@ -168,7 +210,7 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
         const r = await fetchImpl(`${url}/api/agents`, { signal: AbortSignal.timeout(1500) });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         fails = 0;
-        set(castOf(await r.json()));
+        set(castOf(await r.json(), { own }));
       } catch {
         if (++fails >= FAILS_TO_UNLINK) set(null);
       }
@@ -191,7 +233,7 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
       linked, MyDesk gone, or its projects not ready. */
   // (the feed's events after a cursor: the first read takes none — a cold start never replays — then each read the
   // new ones; handoffs are kept, the last 20, with their seq, so every page sees each once whatever its timing)
-  let boardCursor = null;
+  let boardCursor = null, held = new Set();   // (held: the tasks someone holds, at the last read)
   const handoffs = [], moves = [], titles = new Map();
   const known = { claimants: new Map(), statuses: new Map(), froms: new Map() }, { claimants, statuses } = known;
   async function board() {
@@ -204,6 +246,7 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
       if (raw && raw.cursor != null) boardCursor = raw.cursor;
       const tasks = raw && Array.isArray(raw.tasks) ? raw.tasks.filter((t) => t && t.id != null) : [];
       for (const t of tasks) if (t.title) titles.set(String(t.id), String(t.title));
+      held = new Set(tasks.filter((t) => t.claimedBy).map((t) => String(t.id)));
       for (const e of (raw && Array.isArray(raw.events) ? raw.events : [])) {
         if (!e || !Number.isFinite(e.seq)) continue;
         if (e.type === 'handoff_sent' && e.payload && e.payload.sessionId) handoffs.push({ seq: e.seq, taskId: e.taskId, sessionId: e.payload.sessionId });
@@ -232,6 +275,7 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
     allows: (sid) => !cast || (!!sid && cast.claude.has(sid)),
     cast: () => cast,
     md: (id) => (cast && id && cast.external.find((x) => x.id === id)?.md) || null,
+    claimed: (taskId) => taskId != null && held.has(String(taskId)),
     status: () => ({ url, linked: !!cast, sessions: cast ? cast.external.length : null }),
     /** Ask MyDesk to show one of its pages (POST <url>/api/navigate; MyDesk checks the hash) -> true when it did. */
     async open(hash) {

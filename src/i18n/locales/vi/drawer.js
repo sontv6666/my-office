@@ -13,6 +13,9 @@ export default {
   openWindowTerminal: 'Mở cửa sổ terminal',
   openWindowIde: 'Mở cửa sổ IDE',
   openWindowTitle: 'Đưa cửa sổ đang chạy phiên này lên trước (phím O)',
+  openInMyDesk: 'Mở trong MyDesk',
+  openInMyDeskTitle: 'Inspector của MyDesk cho agent này: duyệt, trả lời và gửi tin cho nó ở đó',
+  openInMyDeskFailed: 'Không kết nối được MyDesk để mở.',
   wear: {
     open: '👕 Đổi đồ', title: 'Thay đồ cho người này: áo, kiểu đồ, tóc, phụ kiện, quần',
     shirt: 'Áo', outfit: 'Kiểu đồ', hair: 'Tóc', style: 'Kiểu tóc', acc: 'Phụ kiện', pants: 'Quần',

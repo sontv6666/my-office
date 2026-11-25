@@ -15,6 +15,10 @@ export default {
   openWindowTerminal: 'Open terminal window',
   openWindowIde: 'Open IDE window',
   openWindowTitle: 'Bring the window running this session to the front (O key)',
+  // linked to MyDesk: its Inspector for this agent (approve, answer, send it a message there)
+  openInMyDesk: 'Open in MyDesk',
+  openInMyDeskTitle: "MyDesk's Inspector for this agent: approve, answer and send it a message there",
+  openInMyDeskFailed: "Couldn't reach MyDesk to open it.",
   wear: {
     open: '👕 Change clothes', title: 'Dress this person your way: shirt, outfit, hair, accessory, trousers',
     shirt: 'Shirt', outfit: 'Outfit', hair: 'Hair', style: 'Hair style', acc: 'Accessory', pants: 'Trousers',

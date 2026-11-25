@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTag, applyMydesk, castOf, createMyDesk, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
+import { agentTag, applyMydesk, castOf, createMyDesk, langFrom, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'office-mydesk-'));
 const agent = (over) => ({ id: 'a', sessionId: 'a', name: 'alpha', status: 'working', providerId: 'claude', metadata: { projectPath: 'D:\\w\\app', isSubagent: false }, ...over });
@@ -27,10 +27,10 @@ test('the cast: Claude sessions by session id, other CLIs as records, subagents 
     null, { name: 'no id' },
   ]);
   assert.deepEqual([...c.claude], ['s1']);
-  const md = (state) => ({ state, unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
+  const md = (state, id) => ({ id, state, unreviewed: false, parentId: null, toolWarning: false, projectColor: null, quiet: false, quietSince: null, stopKind: null });
   assert.deepEqual(c.external, [
-    { id: 's1', name: 'alpha', cwd: 'D:\\w\\app', status: 'work', agent: '', tool: '', md: md('working') },   // (the stand-in if the office has no s1)
-    { id: 'cx', name: 'codex-1', cwd: 'D:\\w\\app', status: 'wait', agent: 'codex', tool: 'shell', md: md('help') },
+    { id: 's1', name: 'alpha', cwd: 'D:\\w\\app', status: 'work', agent: '', tool: '', md: md('working', 's1') },   // (the stand-in if the office has no s1)
+    { id: 'cx', name: 'codex-1', cwd: 'D:\\w\\app', status: 'wait', agent: 'codex', tool: 'shell', md: md('help', 'cx') },
   ]);
   assert.deepEqual(castOf('nope'), { claude: new Set(), external: [] });
 });
@@ -86,12 +86,13 @@ test('MyDesk gone (3 failed reads): back to every session', async () => {
 test("MyDesk's own record rides along: an error is not a rest, done-but-unreviewed, the parent, the warning, the colour", () => {
   const [x] = castOf([agent({ status: 'error', unreviewed: true, toolWarning: true, projectColor: '#38BDF8', metadata: { projectPath: 'D:\\w', parentId: 'boss' } })]).external;
   assert.equal(x.status, 'rest', 'the office still has its three');
-  assert.deepEqual(x.md, { state: 'error', unreviewed: true, parentId: 'boss', toolWarning: true, projectColor: '#38bdf8' });
+  assert.deepEqual(x.md, { id: 'a', state: 'error', unreviewed: true, parentId: 'boss', toolWarning: true, projectColor: '#38bdf8', quiet: false, quietSince: null, stopKind: null });
   assert.equal(castOf([agent({ status: 'completed', unreviewed: true })]).external[0].md.state, 'completed');
   // (whatever MyDesk sends, the page gets a plain record)
-  assert.deepEqual(mydeskInfo({ status: '<b>x</b>', projectColor: 'red; background:url(x)', metadata: null }),
-    { state: 'idle', unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
-  assert.deepEqual(mydeskInfo(null), { state: 'idle', unreviewed: false, parentId: null, toolWarning: false, projectColor: null });
+  const plain = { id: null, state: 'idle', unreviewed: false, parentId: null, toolWarning: false, projectColor: null, quiet: false, quietSince: null, stopKind: null };
+  assert.deepEqual(mydeskInfo({ id: 'a/../b?x=1', status: '<b>x</b>', projectColor: 'red; background:url(x)', metadata: null, quiet: { since: 'soon' }, stopError: { kind: '<script>' } }),
+    { ...plain, quiet: true, stopKind: 'unknown' });
+  assert.deepEqual(mydeskInfo(null), plain);
 });
 
 test("a change in MyDesk's record alone (looked at: unreviewed off) is a change of cast, and md(id) reads it", async () => {
@@ -118,4 +119,61 @@ test('applyMydesk: true only when the record on a session changes; null takes it
   assert.equal(applyMydesk(s, null), true);
   assert.equal(s.md, null);
   assert.equal(applyMydesk(s, null), false);
+});
+
+test("MyDesk's quiet and the error its turn ended on ride along too", () => {
+  const [x] = castOf([agent({ status: 'thinking', quiet: { since: 1_700_000_000_000 } })]).external;
+  assert.equal(x.status, 'work', 'still at work for the office');
+  assert.equal(x.md.quiet, true);
+  assert.equal(x.md.quietSince, 1_700_000_000_000);
+  const [y] = castOf([agent({ status: 'error', stopError: { kind: 'rate_limit', details: 'x', message: 'y', at: 1 } })]).external;
+  assert.equal(y.md.stopKind, 'rate_limit');
+  assert.equal(y.md.quiet, false);
+  assert.equal(castOf([agent({ quiet: null, stopError: null })]).external[0].md.stopKind, null);
+});
+
+test("an agent's id is kept for MyDesk's Inspector: another CLI's, with its ':', too", () => {
+  const [a, b] = castOf([agent({ id: 'antigravity:7f3e-11aa', sessionId: 'antigravity:7f3e-11aa', providerId: 'antigravity' }), agent({ id: 'x y', sessionId: 'x y' })]).external;
+  assert.equal(a.md.id, 'antigravity:7f3e-11aa');
+  assert.equal(b.md.id, null, 'one a link cannot carry: no button for it');
+});
+
+test('a teammate is left out, unless the office has that Claude session itself (a lead an older MyDesk flagged)', () => {
+  // what MyDesk lists after a TeammateIdle that carried no agent_id: the flag on the session the hook named
+  const list = [
+    agent({ id: 'lead', sessionId: 'lead', metadata: { isTeammate: true, teamName: 'session-a1b2c3d4', projectPath: 'D:\\w' } }),
+    agent({ id: 'mate', sessionId: 'mate', metadata: { isTeammate: true, parentId: 'lead' } }),
+    agent({ id: 'cx', sessionId: 'cx', providerId: 'codex', metadata: { isTeammate: true } }),
+  ];
+  assert.deepEqual(castOf(list).external.map((x) => x.id), [], 'the office knows none of them: all out, as before');
+  const c = castOf(list, { own: (sid) => sid === 'lead' || sid === 'cx' });
+  assert.deepEqual([...c.claude], ['lead'], 'the lead the office has stays in');
+  assert.deepEqual(c.external.map((x) => x.id), ['lead'], 'another CLI is never one the office has');
+});
+
+test('createMyDesk passes own() on to the cast', async () => {
+  const m = createMyDesk({ dataDir: tmp(), env: { OFFICE_MYDESK_URL: 'http://127.0.0.1:3000' }, everyMs: 0, own: (sid) => sid === 'lead',
+    fetchImpl: reply([agent({ id: 'lead', sessionId: 'lead', metadata: { isTeammate: true } })]) });
+  await m.poll();
+  assert.equal(m.allows('lead'), true);
+});
+
+test("MyDesk's language with its link: only one the office speaks, and only a change", () => {
+  assert.equal(langFrom({ url: 'x', lang: 'vi' }, 'en'), 'vi');
+  assert.equal(langFrom({ lang: 'vi' }, 'vi'), '', 'already speaks it: nothing to switch (no page reloads)');
+  assert.equal(langFrom({ lang: 'xx' }, 'en'), '');
+  assert.equal(langFrom({ lang: '__proto__' }, 'en'), '');
+  assert.equal(langFrom({ url: 'x' }, 'en'), '', 'an older MyDesk sends none');
+  assert.equal(langFrom(null, 'en'), '');
+});
+
+test("the MyDesk page a click opens: a person's Inspector, a held task's Work page, else its project", () => {
+  assert.equal(mydeskHash({ agentId: '3f2a9c1e-77b0-4d6e-9a51-0c2f8e1b5d44' }), '#/agents/3d?inspect=3f2a9c1e-77b0-4d6e-9a51-0c2f8e1b5d44');
+  assert.equal(mydeskHash({ agentId: 'antigravity:7f3e-11aa' }), '#/agents/3d?inspect=antigravity%3A7f3e-11aa', "another CLI's ':' encoded");
+  for (const bad of [null, '', 'a&itab=x', 'a?b', '<img>', 'x'.repeat(161), 42]) assert.equal(mydeskHash({ agentId: bad }), '', String(bad));
+  assert.equal(mydeskHash({ projectId: 'p1', taskId: 't1', claimed: true }), '#/work/t1');
+  assert.equal(mydeskHash({ projectId: 'p1', taskId: 't1', claimed: false }), '#/projects/p1?task=t1');
+  assert.equal(mydeskHash({ projectId: 'p1' }), '#/projects/p1');
+  assert.equal(mydeskHash({ taskId: 't1', claimed: true }), '', 'no project: refused, as before');
+  assert.equal(mydeskHash({ projectId: 'p1', taskId: 't/1', claimed: true }), '#/projects/p1', 'a task id a link cannot carry is left out');
 });

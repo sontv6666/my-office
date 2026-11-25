@@ -138,3 +138,19 @@ test('open(): asks the linked MyDesk to show a page; false when not linked or My
   assert.equal(await md.open('#/projects/p1?task=t1'), true);
   assert.deepEqual(posts.at(-1), ['http://127.0.0.1:3000/api/navigate', { hash: '#/projects/p1?task=t1' }]);
 });
+
+test('claimed(): who holds a task at the last read of the board (its Work page in MyDesk)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-claimed-'));
+  let tasks = RAW.tasks;
+  const fetchImpl = async (u) => ({ ok: true, status: 200, json: async () => (u.endsWith('/api/agents') ? [] : { ...RAW, tasks }) });
+  const m = createMyDesk({ dataDir: dir, env: { OFFICE_MYDESK_URL: 'http://127.0.0.1:3000' }, everyMs: 0, fetchImpl });
+  await m.poll();
+  assert.equal(m.claimed('t1'), false, 'no board read yet');
+  await m.board();
+  assert.equal(m.claimed('t1'), true);
+  assert.equal(m.claimed('t2'), false);
+  assert.equal(m.claimed(undefined), false);
+  tasks = RAW.tasks.map((t) => (t && t.id === 't1' ? { ...t, claimedBy: null } : t));
+  await m.board();
+  assert.equal(m.claimed('t1'), false, 'let go since');
+});

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attentionOf, nextMemory } from '../../src/shared/attention.js';
+import { attentionOf, nextMemory, quietMinutes } from '../../src/shared/attention.js';
 
 const after = (steps) => steps.reduce((m, x) => nextMemory(m, x), undefined);
 
@@ -50,4 +50,26 @@ test("MyDesk's record wins for done-but-unreviewed, and its error counts", () =>
   assert.equal(attentionOf({ status: 'rest', md: { state: 'error', unreviewed: false } }), 'error');
   assert.equal(attentionOf({ status: 'rest', md: { state: 'idle', unreviewed: false } }, { err: true }), 'error', "the office saw it fail");
   assert.equal(attentionOf({ status: 'rest', md: null }, { done: true }), 'review', 'no MyDesk: the page remembers');
+});
+
+test("MyDesk's quiet: at work with no sign of life, until it shows one; waiting still comes first", () => {
+  const md = { state: 'thinking', quiet: true, quietSince: 1000 };
+  assert.equal(attentionOf({ status: 'work', md }), 'quiet');
+  assert.equal(attentionOf({ status: 'work', md: { ...md, quiet: false, quietSince: null } }), '');
+  assert.equal(attentionOf({ status: 'wait', md }), 'wait');
+  assert.equal(attentionOf({ status: 'work', md: { quiet: 'yes' } }), '', 'only a real true');
+});
+
+test("MyDesk's stopError counts as an error at rest", () => {
+  assert.equal(attentionOf({ status: 'rest', md: { state: 'waiting', unreviewed: false, stopKind: 'overloaded' } }), 'error');
+  assert.equal(attentionOf({ status: 'work', md: { state: 'working', stopKind: 'overloaded' } }), '', 'at work again: over');
+});
+
+test('quiet for how many whole minutes', () => {
+  const now = 10 * 60e3;
+  assert.equal(quietMinutes({ quiet: true, quietSince: now - 7.9 * 60e3 }, now), 7);
+  assert.equal(quietMinutes({ quiet: true, quietSince: now + 5000 }, now), 0, 'a clock a little ahead: never negative');
+  assert.equal(quietMinutes({ quiet: true, quietSince: null }, now), null);
+  assert.equal(quietMinutes({ quiet: false, quietSince: 1 }, now), null);
+  assert.equal(quietMinutes(null, now), null);
 });

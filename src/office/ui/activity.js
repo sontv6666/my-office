@@ -5,6 +5,7 @@ import { STATUS_LABEL, verb } from './event-text.js';
 import { TYPE_ICON, TYPE_TONE, icon } from './icons.js';
 import { hoverRing, selRing } from '../interact/rings.js';
 import { AGENT_NAME, agentMark, agentOf, colorOf, dn, dnOf, sessions, workers } from '../people/workers.js';
+import { quietMinutes } from '../../shared/attention.js';
 import { renderLite } from './lite.js';
 import { openSession, renderActivity, renderSessionHead, renderSubs, tab, toggleSession } from './session-drawer.js';
 import { macSnap } from './mac-drawer.js';
@@ -103,13 +104,28 @@ function ago(ts) {
   if (s < 86400) return tr('time.hour', { n: Math.floor(s / 3600) });
   return tr('time.day', { n: Math.floor(s / 86400) });
 }
+/** Why a turn ended on an API error, in a few words (MyDesk's stopError.kind, which is Claude Code's StopFailure
+    `error`), or '' for a kind with no words of its own. */
+export function stopWhy(kind) {
+  if (typeof kind !== 'string' || !/^[a-z_]{1,40}$/.test(kind)) return '';
+  const key = `activity.stopWhy.${kind}`, words = tr(key);
+  return words === key ? '' : words;
+}
+/** What a session holds for you in words, when MyDesk says more than its status does: quiet for how long, the error its
+    turn ended on (the session list's line, the drawer's); '' for anything else. */
+export function heldWords(s, held) {
+  if (held === 'error') { const why = stopWhy(s?.md?.stopKind); return why ? tr('activity.doing.errorWhy', { why }) : tr('activity.doing.error'); }
+  if (held === 'quiet') { const n = quietMinutes(s?.md); return n == null ? tr('activity.doing.quietNow') : tr('activity.doing.quiet', { n }); }
+  return '';
+}
 export function doingOf(s) {
   if (s.status === 'wait') return { ic: 'alert', text: tr('activity.doing.wait') };
   if (s.stuck && s.status !== 'rest') return { ic: 'alert', text: tr(`activity.doing.stuck.${s.stuck.kind}`, { label: s.stuck.label.length > 40 ? `${s.stuck.label.slice(0, 39)}…` : s.stuck.label }), stuck: true };
   const where = whereabouts(workers.get(s.id));   // out of the office: at the shop, on the way home…
   if (where) return where;
   const held = attentionNow(s.id);   // (a failed turn, or done and not looked at: until it works again, ui/needs-you.js)
-  if (held === 'error') return { ic: 'alert', text: tr('activity.doing.error') };
+  if (held === 'error') return { ic: 'alert', text: heldWords(s, held) };
+  if (held === 'quiet') return { ic: 'clock', text: heldWords(s, held) };
   if (held === 'review') return { ic: 'check', text: tr('activity.doing.review') };
   if (s.status === 'rest' && s.bg?.length) return { ic: 'terminal', text: `${tr('activity.doing.bg', { desc: s.bg[0].desc })}${s.bg.length > 1 ? ` (+${s.bg.length - 1})` : ''}` };
   if (s.status === 'rest') return { ic: 'zzz', text: nowMs() - (s.lastAt || 0) < 90e3 ? tr('activity.doing.justDone') : tr('activity.doing.resting', { time: ago(s.lastAt) }) };

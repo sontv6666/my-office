@@ -9,6 +9,9 @@
 .tag--review { border-color: rgba(61, 220, 132, .7); }   /* done, not looked at yet */
 .tag--stuck { border-color: #FF5A5F; box-shadow: 0 0 0 3px rgba(255, 90, 95, .25), 0 6px 16px rgba(0, 0, 0, .35); }   /* stuck in a loop (ui/stuck.js) */
 .tag-stuck { margin-left: 2px; padding: 2px 7px; border-radius: 999px; background: #E5484D; color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.tag--quiet { border-color: #9AA3B2; }   /* MyDesk calls it quiet: at work, no sign of life for 5 minutes (ui/needs-you.js) */
+.tag-quiet { margin-left: 2px; padding: 2px 7px; border-radius: 999px; background: rgba(154, 163, 178, .22); color: #D5DBE5; font-size: 10px; font-weight: 700; }
+.tag-quiet[hidden] { display: none; }
 .shop-say { font-size: 11.5px; padding: 5px 10px; border-width: 1.5px; white-space: nowrap; }   /* a shop's cashier greeting you (shops.js) */
 .cat-say { border-color: #FF8FB0; color: #FFE0EA; font-size: 11px; padding: 4px 9px; }
 /* the pickleball court's count of a test run's shots (world/backdrops/street-pickle.js) */
