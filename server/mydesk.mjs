@@ -53,9 +53,16 @@ const EXT_TOOLS = {
   shell: 'Bash', exec_command: 'Bash', local_shell: 'Bash', unified_exec: 'Bash', write_stdin: 'Bash', 'container.exec': 'Bash',
   apply_patch: 'Edit', web_search: 'WebSearch', update_plan: 'TodoWrite', view_image: 'Read',
 };
-/** Another CLI's tool name as MyDesk sends it -> the Claude Code tool it is ('' for none). */
+/** An agent's tool as MyDesk sends it (its `currentTool`: "Tool: detail", e.g. "Read: C:\\app\\a.js" or "Bash: npm test",
+    from its summarizeTool; an MCP tool as "server · tool") -> the Claude Code tool it is ('' for none): the name before
+    the first ": ", Codex's names in Claude's words, an MCP one as mcp__server__tool. */
 export function extToolName(tool) {
-  const t = typeof tool === 'string' ? tool.trim().slice(0, 80) : '';
+  let t = typeof tool === 'string' ? tool.trim() : '';
+  const cut = t.indexOf(': ');
+  if (cut > 0) t = t.slice(0, cut).trim();
+  t = t.slice(0, 80);
+  const mcp = /^([^\s:·]+) · ([^\s:·]+)$/.exec(t);
+  if (mcp) return `mcp__${mcp[1]}__${mcp[2]}`;
   return t ? (Object.hasOwn(EXT_TOOLS, t) ? EXT_TOOLS[t] : t) : '';
 }
 

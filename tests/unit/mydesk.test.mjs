@@ -183,6 +183,19 @@ test("Codex's tool names in Claude's words; others as they come", () => {
     ['Bash', 'Bash', 'Edit', 'WebSearch', 'TodoWrite', 'Read', 'mcp__gh__search', '', '', '', 'toString']);
 });
 
+test('MyDesk\'s currentTool is "Tool: detail": the name is the part before the first ": "', () => {
+  // as MyDesk's summarizeTool (src/utils.js) writes them, cut at 48 characters
+  assert.equal(extToolName('Read: C:\\Users\\me\\app\\src\\index.js'), 'Read');
+  assert.equal(extToolName('Bash: git commit -m "fix: the cart: total"'), 'Bash', 'a command with ": " in it');
+  assert.equal(extToolName('Edit: D:\\Project\\[1]Personal\\a.ts'), 'Edit');
+  assert.equal(extToolName('shell: npm run build'), 'Bash', "Codex's name with its detail");
+  assert.equal(extToolName('apply_patch: *** Begin Patch'), 'Edit');
+  assert.equal(extToolName('WebFetch: https://example.com/a'), 'WebFetch', 'no ": " before the URL\'s colon');
+  assert.equal(extToolName('github · search_issues'), 'mcp__github__search_issues', 'an MCP tool as MyDesk shows it');
+  assert.equal(extToolName('Grep'), 'Grep', 'a tool with no detail');
+  assert.equal(extToolName(': odd'), ': odd'.trim(), 'nothing before the ": ": left as it is');
+});
+
 test('a spend mark while linked: none for a session that only looked, its numbers for one that did more', () => {
   const at = 1_000_000_000, st = { kind: 'cost', usd: 0.8, mins: 12, at };
   assert.equal(linkedCost(st, 0), 'skip', 'nothing but looking seen');
