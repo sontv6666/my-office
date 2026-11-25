@@ -56,7 +56,7 @@ export function onEvent(e) {
   { const s0 = sessions.get(e.sess);
     if (e.type === 'stop' && s0) onTurnDone(s0);
     if ((e.type === 'wait' || e.type === 'ask') && !e.agent) sfx.play('perm');
-    if ((e.type === 'edit' || e.type === 'write') && !e.agent) sfx.play('key');
+    if ((e.type === 'edit' || e.type === 'write') && !e.agent && !e.ext) sfx.play('key');   // (ext: another CLI's tool by name, nobody heard it typed)
     if (e.type === 'deploy') sfx.play('deploy');
     if (e.type === 'fail') { const now = nowMs(); fails.push(now); while (fails.length && now - fails[0] > 300e3) fails.shift(); if (fails.length >= 3 && state.sim >= state.incidentUntil) { fails.length = 0; startIncident(s0); } }
     if (state.selectedId === e.sess) unseenDone.delete(e.sess); }

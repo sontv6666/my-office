@@ -47,6 +47,18 @@ export function officeStatus(status) {
   return 'rest';
 }
 
+// Codex's tool names in Claude's, so its stand-in goes where the work is done (server/index.mjs upsertExternal). MyDesk
+// already sends Antigravity's in Claude's words (its antigravityProvider); Codex's it passes on as Codex says them.
+const EXT_TOOLS = {
+  shell: 'Bash', exec_command: 'Bash', local_shell: 'Bash', unified_exec: 'Bash', write_stdin: 'Bash', 'container.exec': 'Bash',
+  apply_patch: 'Edit', web_search: 'WebSearch', update_plan: 'TodoWrite', view_image: 'Read',
+};
+/** Another CLI's tool name as MyDesk sends it -> the Claude Code tool it is ('' for none). */
+export function extToolName(tool) {
+  const t = typeof tool === 'string' ? tool.trim().slice(0, 80) : '';
+  return t ? (Object.hasOwn(EXT_TOOLS, t) ? EXT_TOOLS[t] : t) : '';
+}
+
 /** The office's agent tag for a MyDesk provider id ('' for Claude Code, the office's default). */
 export function agentTag(providerId) {
   const p = String(providerId || '').toLowerCase();

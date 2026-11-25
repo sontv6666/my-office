@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTag, applyMydesk, castOf, createMyDesk, langFrom, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
+import { agentTag, applyMydesk, castOf, createMyDesk, extToolName, langFrom, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'office-mydesk-'));
 const agent = (over) => ({ id: 'a', sessionId: 'a', name: 'alpha', status: 'working', providerId: 'claude', metadata: { projectPath: 'D:\\w\\app', isSubagent: false }, ...over });
@@ -176,4 +176,9 @@ test("the MyDesk page a click opens: a person's Inspector, a held task's Work pa
   assert.equal(mydeskHash({ projectId: 'p1' }), '#/projects/p1');
   assert.equal(mydeskHash({ taskId: 't1', claimed: true }), '', 'no project: refused, as before');
   assert.equal(mydeskHash({ projectId: 'p1', taskId: 't/1', claimed: true }), '#/projects/p1', 'a task id a link cannot carry is left out');
+});
+
+test("Codex's tool names in Claude's words; others as they come", () => {
+  assert.deepEqual(['shell', 'exec_command', 'apply_patch', 'web_search', 'update_plan', 'Read', 'mcp__gh__search', '', null, '  ', 'toString'].map(extToolName),
+    ['Bash', 'Bash', 'Edit', 'WebSearch', 'TodoWrite', 'Read', 'mcp__gh__search', '', '', '', 'toString']);
 });

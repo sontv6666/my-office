@@ -48,7 +48,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { applyMydesk, boardFor, createMyDesk, langFrom, mydeskHash } from './mydesk.mjs';
+import { applyMydesk, boardFor, createMyDesk, extToolName, langFrom, mydeskHash } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { poseOf } from '../src/shared/pose.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
@@ -1111,17 +1111,24 @@ function dropStandIn(sid) {
   if (st) dropSession('x' + sid, st);
 }
 // Another CLI's agent (Codex, Gemini…), or a Claude session not found here yet: MyDesk's record is all there is.
+// While it works, a new kind of tool is told as an event of its own, so the person goes where the tool is done (the
+// library to read, the server room for a command…), as a Claude session's own PreToolUse does. Only the name is known
+// (read every 2 s: a short tool can be missed), so it is `quiet` (no feed row, no chat line, not counted in the day's
+// numbers: the agent's own CLI counts it) and `ext` (no typing sound for a tool nobody here saw run).
 function upsertExternal(x) {
   const key = 'x' + x.id, now = Date.now();
   let s = sessions.get(key);
   if (!s) { s = newSession(key); s.external = true; s.agent = x.agent; sessions.set(key, s); }
-  const last = x.tool ? { type: classify(x.tool).type, label: clip(redact(oneLine(x.tool)), 40) } : null;   // (MyDesk sends the tool's name only)
+  const name = extToolName(x.tool), c = name ? classify(name) : null;   // (MyDesk sends the tool's name only: Codex's in its own words)
+  const last = c ? { type: c.type, label: c.type === 'mcp' ? c.label : clip(redact(oneLine(x.tool)), 40) } : null;
   const mdNew = applyMydesk(s, x.md);   // (a stand-in made just now: syncCast laid the records on before it was here)
   if (!mdNew && s.name === x.name && s.cwd === x.cwd && s.status === x.status && JSON.stringify(s.last) === JSON.stringify(last)) return;
+  const moved = x.status === 'work' && !!last && (s.status !== 'work' || last.type !== s.last?.type);
   if (x.status === 'work' && s.status !== 'work') s.taskStart = now;
   if (x.status === 'rest' && s.status !== 'rest') { s.doneAt = now; s.taskStart = 0; }
   s.name = x.name; s.cwd = x.cwd; s.status = x.status; s.last = last; s.lastEventAt = now;
-  broadcast({ k: 'sess', s: pub(s) });
+  if (moved) broadcast({ k: 'ev', e: { id: ++seq, ts: now, sess: s.id, name: s.name, type: last.type, label: last.label, quiet: true, ext: true }, s: pub(s) });
+  else broadcast({ k: 'sess', s: pub(s) });
 }
 function dropSession(key, s) {
   if (s.fromFile && !taskSids.has(s.sid) && !s.viaOffice) chat.onLeft(s.title || s.name);
