@@ -158,6 +158,16 @@ export function createLoopGuard({ config = () => LOOP_DEFAULTS, labelOf = defaul
     /** Your hint, for Claude at its next step (a turn already over can't take it: the chat carries the conversation on). */
     hint(sid, text) { const h = String(text || '').trim().slice(0, HINT_MAX); if (!sid || !h) return false; sess(sid).hint = h; return true; },
     stuckOf: (sid) => known.get(sid)?.stuck || null,
+    /** The 'cost' mark that just fired is not shown (my-office's mydesk-source: linked to MyDesk, a session that only
+        looked around): it is forgotten, so the other signs can still fire, and the spend is weighed again at the
+        next reading of the status line (then with its numbers as they are). -> false when there was none to forget. */
+    unfire(sid) {
+      const x = known.get(sid);
+      if (!x || x.stuck?.kind !== 'cost') return false;
+      x.stuck = null;
+      if (x.cost) x.cost.fired = false;
+      return true;
+    },
     config: cfg,
   };
 }

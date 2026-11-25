@@ -1824,9 +1824,10 @@ function onLoop(s, sig) {
     const st = sig.stuck, run = loopRun(s);
     // linked to MyDesk: spending with nothing edited is its numbers on the name tag, nothing said (people/workers.js
     // setStuck), and no mark at all for a session that only looked around since the spend began (a review, a study)
+    // (skipped: the loop guard forgets it, so it is weighed again at the next status line reading — shown, with its
+    // numbers then, once the session has done more than look — and a compaction mark is not held back meanwhile)
     const cost = st.kind === 'cost' && mydeskGuards() ? linkedCost(st, s.actAt || 0) : '';
-    s.costSkipped = cost === 'skip';
-    if (s.costSkipped) return;
+    if (cost === 'skip') { loops.unfire(s.sid); return; }
     if (card && ['on', 'stopping'].includes(chat.byId(card.id)?.loop?.state)) setCard({ state: 'over', why: 'again' });   // (stuck another way: the new card below says how)
     s.stuck = { kind: st.kind, label: st.label || '', n: st.n || 0, blocked: st.blocked || 0, usd: st.usd ?? null, mins: st.mins || 0, at: st.at, ...(cost === 'numbers' && { numbers: true }) };
     broadcast({ k: 'sess', s: pub(s) });
@@ -1838,7 +1839,6 @@ function onLoop(s, sig) {
     if (s.stuck) { s.stuck.blocked = sig.stuck.blocked; broadcast({ k: 'sess', s: pub(s) }); }
     setCard({ blocked: sig.stuck.blocked, ...(sig.hint && { hint: 'got' }) });
   } else if (sig.type === 'clear') {
-    if (s.costSkipped && sig.stuck?.kind === 'cost') { s.costSkipped = false; return; }   // (a mark never shown: nothing to take down)
     s.stuck = null; broadcast({ k: 'sess', s: pub(s) });
     if (card && chat.byId(card.id)?.loop?.state !== 'stopped') setCard({ state: 'over', why: sig.why, ...(sig.hintLost && { hint: 'lost' }) });
   } else if (sig.type === 'hint') setCard({ hint: 'got' });

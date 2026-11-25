@@ -144,3 +144,40 @@ test('memory stays bounded: the 64 sessions heard from last', () => {
   assert.equal(g.check({ session_id: 's0', tool_name: 'Bash', tool_input: { command: 'x' } }).deny, null, 'forgotten');
   assert.ok(g.check({ session_id: 's199', tool_name: 'Bash', tool_input: { command: 'x' } }).deny);
 });
+
+test('unfire: a cost mark the office does not show is forgotten, other signs still fire, and the spend is weighed again', () => {
+  const { g, tick } = guard();
+  const cost = (usd) => g.onStatus(sid, { total_cost_usd: usd, total_lines_added: 0, total_lines_removed: 0 }, true);
+  cost(1.0);
+  for (let m = 1; m <= 9; m++) { tick(60e3); cost(1.0 + m * 0.2); }
+  tick(60e3);
+  assert.equal(cost(3.1).stuck.kind, 'cost');
+  assert.equal(g.unfire(sid), true);
+  assert.equal(g.stuckOf(sid), null, 'nothing left stuck');
+  assert.equal(g.unfire(sid), false, 'once');
+  // a compaction run is not held back by a mark nobody saw
+  for (let i = 0; i < 2; i++) { tick(60e3); assert.equal(g.onEvent({ session_id: sid, hook_event_name: 'PreCompact', trigger: 'auto' }), null); }
+  tick(60e3);
+  const c = g.onEvent({ session_id: sid, hook_event_name: 'PreCompact', trigger: 'auto' });
+  assert.equal(c.type, 'fire'); assert.equal(c.stuck.kind, 'compact');
+  g.onEvent({ session_id: sid, hook_event_name: 'UserPromptSubmit' });   // (you wrote: the compact mark goes, the spend starts again)
+  for (let m = 1; m <= 9; m++) { tick(60e3); cost(3.1 + m * 0.2); }
+  tick(60e3);
+  const again = cost(5.3);
+  assert.equal(again.type, 'fire'); assert.equal(again.stuck.kind, 'cost', 'weighed again, with its numbers as they are now');
+});
+
+test('unfire: the next reading weighs it again at once, with the spend and minutes as they are then', () => {
+  const { g, tick } = guard();
+  const cost = (usd) => g.onStatus(sid, { total_cost_usd: usd, total_lines_added: 0, total_lines_removed: 0 }, true);
+  cost(1.0);
+  for (let m = 1; m <= 10; m++) { tick(60e3); cost(1.0 + m * 0.2); }
+  assert.equal(g.stuckOf(sid)?.kind, 'cost');
+  g.unfire(sid);
+  tick(120e3);
+  const s = cost(3.6);
+  assert.equal(s.type, 'fire');
+  assert.deepEqual([s.stuck.usd, s.stuck.mins], [2.6, 12]);
+  assert.equal(g.unfire('nobody'), false);
+  assert.equal(g.check({ session_id: sid, tool_name: 'Bash', tool_input: { command: 'ls' } }).deny, null, 'an unfired cost mark never denies anything');
+});
