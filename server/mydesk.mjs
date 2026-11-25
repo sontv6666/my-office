@@ -315,11 +315,12 @@ export function createMyDesk({ dataDir, onChange = () => {}, fetchImpl = fetch, 
     md: (id) => (cast && id && cast.external.find((x) => x.id === id)?.md) || null,
     claimed: (taskId) => taskId != null && held.has(String(taskId)),
     status: () => ({ url, linked: !!cast, sessions: cast ? cast.external.length : null }),
-    /** Ask MyDesk to show one of its pages (POST <url>/api/navigate; MyDesk checks the hash) -> true when it did. */
-    async open(hash) {
+    /** Ask MyDesk to show one of its pages (POST <url>/api/navigate; MyDesk checks the hash) -> true when it did.
+        raise: asked from the office in MyDesk's PiP window, so MyDesk brings its main window forward too. */
+    async open(hash, { raise = false } = {}) {
       if (!url) return false;
       try {
-        const r = await fetchImpl(`${url}/api/navigate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }), signal: AbortSignal.timeout(1500) });
+        const r = await fetchImpl(`${url}/api/navigate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(raise ? { hash, raise: true } : { hash }), signal: AbortSignal.timeout(1500) });
         return r.ok;
       } catch { return false; }
     },

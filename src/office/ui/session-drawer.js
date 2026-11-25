@@ -116,9 +116,11 @@ function renderActions() {
     if (qrFor !== s.id) box.append(el('p', 'dr-note', tr('drawer.openOnClaudeNote')));
   }
 }
+// shown in MyDesk's PiP window (app/layout.tsx marks it embed-pip): MyDesk's main window, where the page opens, comes forward
+const inPip = () => document.documentElement.classList.contains('embed-pip');
 async function openInMyDesk(s) {
   try {
-    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sess: s.id }) });
+    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sess: s.id, ...(inPip() && { raise: true }) }) });
     if (!(r.ok && (await r.json()).ok)) toast(tr('drawer.openInMyDeskFailed'), 4000);
   } catch { toast(tr('drawer.openInMyDeskFailed'), 4000); }
 }

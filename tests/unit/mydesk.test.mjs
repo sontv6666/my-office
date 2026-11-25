@@ -217,6 +217,15 @@ test("the link is taken from MyDesk's own process only: JSON and no Origin, neve
   assert.equal(linkAllowed({}), false);
 });
 
+test('open(hash, { raise }): asked from MyDesk\'s PiP window, MyDesk is asked to bring its main window forward too', async () => {
+  const posts = [];
+  const m = createMyDesk({ dataDir: tmp(), env: { OFFICE_MYDESK_URL: 'http://127.0.0.1:3000' }, everyMs: 0,
+    fetchImpl: async (u, init = {}) => { if (u.endsWith('/api/navigate')) posts.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => [] }; } });
+  assert.equal(await m.open('#/work/t1'), true);
+  assert.equal(await m.open('#/agents/3d?inspect=s1', { raise: true }), true);
+  assert.deepEqual(posts, [{ hash: '#/work/t1' }, { hash: '#/agents/3d?inspect=s1', raise: true }]);
+});
+
 test('own(): a lead MyDesk flagged before the office met it is let in once the office knows it (its hooks, its session file)', async () => {
   const known = new Set();
   const lead = agent({ id: 'lead', sessionId: 'lead', metadata: { isTeammate: true } });

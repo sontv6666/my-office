@@ -19,7 +19,8 @@ function close() { if (root) { root.remove(); root = null; } }
 
 async function openInMyDesk(t) {
   try {
-    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: t.projectId, taskId: t.id }) });
+    const pip = document.documentElement.classList.contains('embed-pip');   // (in MyDesk's PiP window: its main window comes forward)
+    const r = await fetch('/api/mydesk/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: t.projectId, taskId: t.id, ...(pip && { raise: true }) }) });
     const ok = r.ok && (await r.json()).ok;
     if (ok) close(); else toast(tr('board.tasks.openFailed'), 4000);
   } catch { toast(tr('board.tasks.openFailed'), 4000); }

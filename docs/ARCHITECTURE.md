@@ -211,11 +211,11 @@ engine switches to demo mode and talks to no API.
 | `ui/portraits.js` | 64 | Portraits of the two character looks for Settings → Characters: two people in each look, drawn by the office's own renderer (same materials, light and tone mapping, so they match what you will see) into a canvas, the first time the tab opens. |
 | `ui/session-account.js` | 54 | "Change account" in a session's drawer (on this computer only): the accounts of the plan card, each with what it has left. |
 | `ui/session-compose.js` | 122 | Writing to a session from its own page: a box under the conversation, the same way as the group chat's "Gửi tới" (POST /api/tasks { sid, text, images, chat: true }; a session at work asks first, then POST /api/tasks/steer). |
-| `ui/session-drawer.js` | 420 | The session drawer: chat, steps, subagents. |
+| `ui/session-drawer.js` | 422 | The session drawer: chat, steps, subagents. |
 | `ui/settings.js` | 126 | Settings popover: backdrop, floor plan, look, time, toggles. |
 | `ui/stranded.js` | 159 | "Việc bỏ quên" in the Mac drawer: the worktrees and checkouts of the repositories the office knows that still hold work (files not committed, commits not pushed, stashes), and worktrees with nothing left in them that could go. |
 | `ui/stuck.js` | 97 | Stuck sessions ("Ngắt vòng lặp kẹt", server/loops.mjs): the card in the group chat (what repeats, Stop, a hint for Claude) and the row in Settings → More (on or off, after how many failures, after how many minutes of spending with nothing edited). |
-| `ui/task-board-sheet.js` | 110 | The task board, read up close: a click on the wall board opens this sheet — MyDesk's Projects tasks in four columns (to do, doing, review, done), each with who holds it. |
+| `ui/task-board-sheet.js` | 111 | The task board, read up close: a click on the wall board opens this sheet — MyDesk's Projects tasks in four columns (to do, doing, review, done), each with who holds it. |
 | `ui/task-board.js` | 210 | MyDesk's Projects tasks on the office wall (company floor: on the library's low wall, facing the desks), and each task in progress pinned as a note at the desk of whoever claimed it (src/shared/task-board.js decides which). |
 | `ui/task-moves.js` | 123 | Task moves acted out on the floor, as Munder Difflin's office plays its ledger (src/shared/task-moves.js decides who moves): MyDesk's board feed says a task was claimed, and the claimant — only while resting — gets up, walks to the task board, takes the note and carries it to their desk; a claimed task going to review or done, they carry it from their desk back to the board. |
 | `ui/task-sheet.js` | 109 | "Giao việc": giving Claude work from the group chat (server/tasks.mjs runs it on the Mac). |

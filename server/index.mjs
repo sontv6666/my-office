@@ -2848,7 +2848,7 @@ const server = http.createServer((req, res) => {
       const hash = b?.sess !== undefined ? mydeskHash({ agentId: s?.md?.id ?? null })
         : mydeskHash({ projectId: b?.projectId, taskId: b?.taskId, claimed: mydesk.claimed(b?.taskId) });
       if (!hash) { json(res, b?.sess !== undefined && !s ? 404 : 400, { ok: false }); return; }
-      json(res, 200, { ok: await mydesk.open(hash) });
+      json(res, 200, { ok: await mydesk.open(hash, { raise: b?.raise === true }) });   // (raise: from MyDesk's PiP window, its main window comes forward)
     });
     return;
   }
