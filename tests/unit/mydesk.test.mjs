@@ -216,3 +216,14 @@ test("the link is taken from MyDesk's own process only: JSON and no Origin, neve
   assert.equal(linkAllowed({ 'content-type': 'text/plain' }), false, 'not JSON');
   assert.equal(linkAllowed({}), false);
 });
+
+test('own(): a lead MyDesk flagged before the office met it is let in once the office knows it (its hooks, its session file)', async () => {
+  const known = new Set();
+  const lead = agent({ id: 'lead', sessionId: 'lead', metadata: { isTeammate: true } });
+  const m = createMyDesk({ dataDir: tmp(), env: { OFFICE_MYDESK_URL: 'http://127.0.0.1:3000' }, everyMs: 0, own: (sid) => known.has(sid), fetchImpl: reply([lead]) });
+  await m.poll();
+  assert.equal(m.allows('lead'), false, 'not met yet: out, as a teammate');
+  known.add('lead');   // (its first hook held here, or its live session file found)
+  await m.poll();
+  assert.equal(m.allows('lead'), true);
+});

@@ -252,8 +252,11 @@ const sidToKey = new Map();
 // While MyDesk lists the sessions, it owns "undo last turn" and the shared-file / port notes (learned from this very
 // office); a second copy here would tell Claude twice. MyDesk gone (3 failed reads) -> the office does them again.
 const mydeskGuards = () => mydesk.status().linked;
-// (own: a Claude session the office has itself — a teammate flag from MyDesk never drops it, server/mydesk.mjs castOf)
-const mydesk = createMyDesk({ dataDir: DATA_DIR, onChange: (cast) => { syncCast(cast).catch((err) => console.error('mydesk', err)); }, own: (sid) => !!bySid(sid) });
+// (own: a Claude session this office knows itself — on its floor, a live session file found, or its hooks held while
+// MyDesk did not list it — is never dropped for a teammate flag from MyDesk, server/mydesk.mjs castOf)
+const mydesk = createMyDesk({ dataDir: DATA_DIR, onChange: (cast) => { syncCast(cast).catch((err) => console.error('mydesk', err)); },
+  own: (sid) => !!sid && (!!bySid(sid) || foundSids.has(sid) || held.has(sid)) });
+let foundSids = new Set();   // the session ids of live Claude processes in the last scan of their session files
 let feed = [];
 let seq = 0;
 const today = () => new Date().toLocaleDateString('sv-SE');
@@ -905,11 +908,12 @@ async function sameProcess(j) {
 async function doScan() {
   let files = [];
   try { files = (await fsp.readdir(SESS_DIR)).filter((f) => f.endsWith('.json')); } catch { return; }
-  const live = new Set();
+  const live = new Set(), found = new Set();   // (found: before MyDesk's say — a lead it flagged as a teammate is still this office's own, castOf)
   for (const f of files) {
     let j;
     try { j = JSON.parse(await fsp.readFile(path.join(SESS_DIR, f), 'utf8')); } catch { continue; }
     if (!j.pid || !alive(j.pid) || !(await sameProcess(j))) continue;
+    if (j.sessionId) found.add(String(j.sessionId));
     if (!mydesk.allows(j.sessionId)) continue;   // (linked to MyDesk: a session it does not list stays out)
     const key = 'p' + j.pid;
     live.add(key);
@@ -938,6 +942,7 @@ async function doScan() {
     if (!s.lastPrompt && !s.recalled && s.sid && s.cwd) { s.recalled = true; recallTask(s); }
     if (s.sid && s.cwd && !s.titleAt) { refreshTitle(s, true); originOf(s).then((o) => { if (o && o !== s.origin) { s.origin = o; broadcast({ k: 'sess', s: pub(s) }); } }); }
   }
+  foundSids = found;
   for (const [key, s] of sessions) {
     if (s.fromFile && !live.has(key) && !(s.parked && Date.now() - s.parked.at < PARK_MS)) dropSession(key, s);   // (a moved one waits at its desk)
   }
