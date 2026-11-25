@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTag, applyMydesk, castOf, createMyDesk, extToolName, langFrom, linkedCost, LOOK_TOOLS, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
+import { agentTag, applyMydesk, castOf, createMyDesk, extToolName, langFrom, linkAllowed, linkedCost, LOOK_TOOLS, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'office-mydesk-'));
 const agent = (over) => ({ id: 'a', sessionId: 'a', name: 'alpha', status: 'working', providerId: 'claude', metadata: { projectPath: 'D:\\w\\app', isSubagent: false }, ...over });
@@ -204,4 +204,15 @@ test('a spend mark while linked: none for a session that only looked, its number
   assert.equal(linkedCost(st, at - 12.5 * 60e3), 'numbers', 'a minute of slack for the rounded minutes');
   for (const t of ['Read', 'Grep', 'WebFetch', 'TodoWrite', 'Agent']) assert.ok(LOOK_TOOLS.has(t), t);
   for (const t of ['Bash', 'Edit', 'Write', 'mcp__db__query']) assert.ok(!LOOK_TOOLS.has(t), t);
+});
+
+test("the link is taken from MyDesk's own process only: JSON and no Origin, never a browser page's post", () => {
+  // MyDesk's myOffice.link(): Node's fetch, { 'Content-Type': 'application/json' }, no Origin header
+  assert.equal(linkAllowed({ host: '127.0.0.1:4310', 'content-type': 'application/json', 'user-agent': 'node' }), true);
+  assert.equal(linkAllowed({ 'content-type': 'application/json; charset=utf-8' }), true);
+  assert.equal(linkAllowed({ 'content-type': 'text/plain', origin: 'https://evil.example' }), false, 'a no-cors fetch from a page');
+  assert.equal(linkAllowed({ 'content-type': 'application/x-www-form-urlencoded', origin: 'null' }), false, 'a form');
+  assert.equal(linkAllowed({ 'content-type': 'application/json', origin: 'http://127.0.0.1:4310' }), false, 'even the office\'s own pages never link');
+  assert.equal(linkAllowed({ 'content-type': 'text/plain' }), false, 'not JSON');
+  assert.equal(linkAllowed({}), false);
 });

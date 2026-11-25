@@ -14,6 +14,13 @@ import { LANGS } from '../src/i18n/index.js';
 
 const FAILS_TO_UNLINK = 3;
 
+/** POST /api/mydesk (the link, MyDesk's language) from MyDesk's own process only: its Node fetch sends JSON and no
+    Origin. A web page open in a browser on this computer reaches loopback too, but its POST carries an Origin (a form,
+    a no-cors fetch): refused, so it cannot re-link the office or switch its language and reload every page. */
+export function linkAllowed(headers = {}) {
+  return headers.origin === undefined && String(headers['content-type'] || '').toLowerCase().startsWith('application/json');
+}
+
 /** The language MyDesk sends with its link ({ url, lang }: its EN | VI switch) -> the language the office should switch
     to, or '' when none is asked for, the office does not speak it, or it speaks it already (`now`). */
 export function langFrom(body, now) {

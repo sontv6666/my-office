@@ -48,7 +48,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { applyMydesk, boardFor, createMyDesk, extToolName, langFrom, linkedCost, LOOK_TOOLS, mydeskHash } from './mydesk.mjs';
+import { applyMydesk, boardFor, createMyDesk, extToolName, langFrom, linkAllowed, linkedCost, LOOK_TOOLS, mydeskHash } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { poseOf } from '../src/shared/pose.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
@@ -2859,6 +2859,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/mydesk' && (req.method === 'GET' || req.method === 'POST')) {
     if (!isLoopback(req)) { res.writeHead(403).end(); return; }
     if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(mydesk.status())); return; }
+    if (!linkAllowed(req.headers)) { json(res, 403, { ok: false }); return; }   // (a web page in a browser here can't re-link the office or switch its language)
     const chunks = [];
     req.on('data', (c) => { if (chunks.length < 16) chunks.push(c); });
     req.on('end', () => {
