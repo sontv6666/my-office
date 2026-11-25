@@ -237,13 +237,18 @@ export function setup() {
       if (!this.teamEl) { this.teamEl = el('span', 'tag-team'); this.tagEl.append(this.teamEl); }
       this.teamEl.hidden = !n; this.teamEl.textContent = n ? tr('people.team', { n }) : '';
     }
-    // stuck in a loop (server/loops.mjs): a red "kẹt" on the name tag, and said out loud once when it starts
+    // stuck in a loop (server/loops.mjs): a red "kẹt" on the name tag, and said out loud once when it starts. Linked to
+    // MyDesk, a 'cost' mark comes with `numbers` (server/index.mjs onLoop): the tag says them ("$0.80 / 12 min, no file
+    // edited") and nobody says anything: the spend is a real signal, a line about going round in circles is a guess.
     setStuck(st) {
-      const on = !!st; if (this.stuck === on) return;
-      const was = this.stuck; this.stuck = on;
-      if (!this.stuckEl) { this.stuckEl = el('span', 'tag-stuck', tr('people.stuck')); this.tagEl.append(this.stuckEl); }
+      const on = !!st, numbers = !!(on && st.numbers && st.kind === 'cost');
+      const label = numbers ? tr('people.stuckCost', { usd: `$${Number(st.usd || 0).toFixed(2)}`, mins: st.mins || 0 }) : tr('people.stuck');
+      if (this.stuck === on && (!on || this.stuckLabel === label)) return;
+      const was = this.stuck; this.stuck = on; this.stuckLabel = label;
+      if (!this.stuckEl) { this.stuckEl = el('span', 'tag-stuck', label); this.tagEl.append(this.stuckEl); }
+      this.stuckEl.textContent = label; this.stuckEl.classList.toggle('is-numbers', numbers);
       this.stuckEl.hidden = !on; this.tagEl.classList.toggle('tag--stuck', on);
-      if (on && was === false) this.say('fail', tr('people.stuckSay'), 'fail');
+      if (on && was === false && !numbers) this.say('fail', tr('people.stuckSay'), 'fail');
     }
     rebuild() {
       const { root, P } = makeChibi({ ...this.cfg, look: state.LOOK }, this.scale);

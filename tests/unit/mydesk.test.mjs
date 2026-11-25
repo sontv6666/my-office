@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTag, applyMydesk, castOf, createMyDesk, extToolName, langFrom, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
+import { agentTag, applyMydesk, castOf, createMyDesk, extToolName, langFrom, linkedCost, LOOK_TOOLS, mydeskHash, mydeskInfo, officeStatus } from '../../server/mydesk.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'office-mydesk-'));
 const agent = (over) => ({ id: 'a', sessionId: 'a', name: 'alpha', status: 'working', providerId: 'claude', metadata: { projectPath: 'D:\\w\\app', isSubagent: false }, ...over });
@@ -181,4 +181,14 @@ test("the MyDesk page a click opens: a person's Inspector, a held task's Work pa
 test("Codex's tool names in Claude's words; others as they come", () => {
   assert.deepEqual(['shell', 'exec_command', 'apply_patch', 'web_search', 'update_plan', 'Read', 'mcp__gh__search', '', null, '  ', 'toString'].map(extToolName),
     ['Bash', 'Bash', 'Edit', 'WebSearch', 'TodoWrite', 'Read', 'mcp__gh__search', '', '', '', 'toString']);
+});
+
+test('a spend mark while linked: none for a session that only looked, its numbers for one that did more', () => {
+  const at = 1_000_000_000, st = { kind: 'cost', usd: 0.8, mins: 12, at };
+  assert.equal(linkedCost(st, 0), 'skip', 'nothing but looking seen');
+  assert.equal(linkedCost(st, at - 20 * 60e3), 'skip', 'its last command was before the spend began');
+  assert.equal(linkedCost(st, at - 5 * 60e3), 'numbers');
+  assert.equal(linkedCost(st, at - 12.5 * 60e3), 'numbers', 'a minute of slack for the rounded minutes');
+  for (const t of ['Read', 'Grep', 'WebFetch', 'TodoWrite', 'Agent']) assert.ok(LOOK_TOOLS.has(t), t);
+  for (const t of ['Bash', 'Edit', 'Write', 'mcp__db__query']) assert.ok(!LOOK_TOOLS.has(t), t);
 });

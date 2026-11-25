@@ -59,6 +59,18 @@ export function extToolName(tool) {
   return t ? (Object.hasOwn(EXT_TOOLS, t) ? EXT_TOOLS[t] : t) : '';
 }
 
+// Tools that only look (read, search, plan, hand out work): a session calling nothing else edits nothing on purpose.
+export const LOOK_TOOLS = new Set(['Read', 'NotebookRead', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'TodoWrite', 'TaskCreate', 'TaskUpdate',
+  'TaskList', 'TaskGet', 'TaskOutput', 'BashOutput', 'ToolSearch', 'Skill', 'EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion', 'Agent', 'Task']);
+/** A 'cost' stuck mark (server/loops.mjs: the spend rising with no file edited) while linked to MyDesk -> 'skip' when
+    the session called only tools that look since the spend began (a review, a study: no mark at all), else 'numbers'
+    (the mark shows its numbers on the name tag and nobody says anything). actAt: when the session last called a tool
+    that does more than look (ms; 0: none seen). */
+export function linkedCost(stuck, actAt = 0) {
+  const from = Number(stuck?.at) - Number(stuck?.mins || 0) * 60e3 - 60e3;   // (its minutes are rounded: a minute's slack)
+  return Number.isFinite(from) && Number(actAt) >= from ? 'numbers' : 'skip';
+}
+
 /** The office's agent tag for a MyDesk provider id ('' for Claude Code, the office's default). */
 export function agentTag(providerId) {
   const p = String(providerId || '').toLowerCase();

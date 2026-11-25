@@ -5,6 +5,7 @@ export default {
   needsApproval: 'Chờ duyệt',
   stuck: 'kẹt',
   stuckSay: 'Loay hoay mãi một chỗ…',
+  stuckCost: '{usd} / {mins} phút, chưa sửa file',
   subOnIt: 'Nhận việc: {task}',
   subThinking: 'Đang nghĩ cách làm',
   subReport: 'Báo cáo: {what}',

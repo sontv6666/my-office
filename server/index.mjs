@@ -48,7 +48,7 @@ import { createLoopGuard, LOOP_DEFAULTS, LOOP_MIN, LOOP_N } from './loops.mjs';
 import { createTenure, FAREWELL_DAYS, FAREWELL_DEFAULT } from './tenure.mjs';
 import { cacheClock, cacheFromResume, cacheFromStatus, cacheGuess } from '../src/shared/cache-clock.js';
 import { createOtel } from './otel.mjs';
-import { applyMydesk, boardFor, createMyDesk, extToolName, langFrom, mydeskHash } from './mydesk.mjs';
+import { applyMydesk, boardFor, createMyDesk, extToolName, langFrom, linkedCost, LOOK_TOOLS, mydeskHash } from './mydesk.mjs';
 import { cleanWear, guessDesk, lookOf, wearOn } from '../src/shared/look.js';
 import { poseOf } from '../src/shared/pose.js';
 import { managedEnvs, otelOwner } from './otel-setup.mjs';
@@ -1240,6 +1240,7 @@ async function onHook(p) {
       break;
     }
     case 'PreToolUse': {
+      if (!LOOK_TOOLS.has(p.tool_name)) s.actAt = now;   // (it did more than look: a spend with nothing edited is worth a mark, onLoop)
       const c = await classifyVi(p.tool_name, p.tool_input);
       const runner = p.tool_name === 'Bash' && testRunner(p.tool_input?.command);   // a test run: the test board lights up for it
       if (runner) Object.assign(c, { type: 'test', runner });
@@ -1821,8 +1822,13 @@ function onLoop(s, sig) {
   const setCard = (loop) => { if (card) chat.setLoop(card.id, loop); };
   if (sig.type === 'fire') {
     const st = sig.stuck, run = loopRun(s);
+    // linked to MyDesk: spending with nothing edited is its numbers on the name tag, nothing said (people/workers.js
+    // setStuck), and no mark at all for a session that only looked around since the spend began (a review, a study)
+    const cost = st.kind === 'cost' && mydeskGuards() ? linkedCost(st, s.actAt || 0) : '';
+    s.costSkipped = cost === 'skip';
+    if (s.costSkipped) return;
     if (card && ['on', 'stopping'].includes(chat.byId(card.id)?.loop?.state)) setCard({ state: 'over', why: 'again' });   // (stuck another way: the new card below says how)
-    s.stuck = { kind: st.kind, label: st.label || '', n: st.n || 0, blocked: st.blocked || 0, usd: st.usd ?? null, mins: st.mins || 0, at: st.at };
+    s.stuck = { kind: st.kind, label: st.label || '', n: st.n || 0, blocked: st.blocked || 0, usd: st.usd ?? null, mins: st.mins || 0, at: st.at, ...(cost === 'numbers' && { numbers: true }) };
     broadcast({ k: 'sess', s: pub(s) });
     const m = chat.loopCard(s.id, { ...s.stuck, state: 'on', hint: sig.hint ? 'got' : null, sess: s.id, task: run?.id || null });
     if (m) { loopCards.delete(s.id); loopCards.set(s.id, { id: m.id }); if (loopCards.size > 16) loopCards.delete(loopCards.keys().next().value); }
@@ -1832,6 +1838,7 @@ function onLoop(s, sig) {
     if (s.stuck) { s.stuck.blocked = sig.stuck.blocked; broadcast({ k: 'sess', s: pub(s) }); }
     setCard({ blocked: sig.stuck.blocked, ...(sig.hint && { hint: 'got' }) });
   } else if (sig.type === 'clear') {
+    if (s.costSkipped && sig.stuck?.kind === 'cost') { s.costSkipped = false; return; }   // (a mark never shown: nothing to take down)
     s.stuck = null; broadcast({ k: 'sess', s: pub(s) });
     if (card && chat.byId(card.id)?.loop?.state !== 'stopped') setCard({ state: 'over', why: sig.why, ...(sig.hintLost && { hint: 'lost' }) });
   } else if (sig.type === 'hint') setCard({ hint: 'got' });

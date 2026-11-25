@@ -8,6 +8,8 @@ export default {
   needsApproval: 'Needs approval',
   stuck: 'stuck',
   stuckSay: 'Going round in circles…',
+  // linked to MyDesk: a spend mark's tag, its numbers only (people/workers.js setStuck)
+  stuckCost: '{usd} / {mins} min, no file edited',
   // a subagent arrives at its boss, then reports back
   subOnIt: 'On it: {task}',
   subThinking: 'Working out a plan',
