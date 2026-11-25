@@ -172,7 +172,7 @@ engine switches to demo mode and talks to no API.
 | `people/staff.js` | 394 | People who work here but aren't sessions: the receptionist, the evening cleaner, a Shopee courier with a parcel. |
 | `people/team-lines.js` | 49 | Dashed lines from a boss to its subagents: always there, faint, so whose helper is whose reads at a glance; strong for the boss you selected or point at (or whose helper you point at). |
 | `people/teatime.js` | 91 | Friday 16:00: afternoon tea. |
-| `people/workers.js` | 571 | Workers: one character per session or subagent, what they do and where they walk. |
+| `people/workers.js` | 580 | Workers: one character per session or subagent, what they do and where they walk. |
 | `replay/replay.js` | 164 | Replay and recording. |
 | `replay/timeline.js` | 193 | The timeline: one lane per session. |
 | `scene/blocks.js` | 32 | Building blocks: materials, rounded boxes, cylinders, rugs, canvas textures. |

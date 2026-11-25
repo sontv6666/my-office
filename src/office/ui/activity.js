@@ -4,7 +4,7 @@ import { $, el, fmtBytes, fmtClock, hhmm, nowMs } from '../core/env.js';
 import { STATUS_LABEL, verb } from './event-text.js';
 import { TYPE_ICON, TYPE_TONE, icon } from './icons.js';
 import { hoverRing, selRing } from '../interact/rings.js';
-import { AGENT_NAME, agentMark, agentOf, colorOf, dn, dnOf, sessions, workers } from '../people/workers.js';
+import { agentMark, agentName, agentOf, colorOf, dn, dnOf, sessions, workers } from '../people/workers.js';
 import { quietMinutes } from '../../shared/attention.js';
 import { renderLite } from './lite.js';
 import { openSession, renderActivity, renderSessionHead, renderSubs, tab, toggleSession } from './session-drawer.js';
@@ -163,7 +163,7 @@ const metaTime = (s) => (s.status === 'work' && s.taskStart ? fmtClock((nowMs() 
 function railRow(s) {
   const li = el('li', 'ri-li');
   const b = el('button', 'ri'); b.type = 'button'; b.dataset.sess = s.id;
-  const av = el('span', 'av'), avTxt = el('span', 'av-txt'); av.append(avTxt, el('i', 'av-st')); avTxt.append(agentMark(agentOf(s))); av.title = AGENT_NAME[agentOf(s)];
+  const av = el('span', 'av'), avTxt = el('span', 'av-txt'); av.append(avTxt, el('i', 'av-st')); avTxt.append(agentMark(agentOf(s))); av.title = agentName(s);
   const main = el('span', 'ri-main'), top = el('span', 'ri-top'), name = el('span', 'ri-name'), doing = el('span', 'ri-doing');
   const dIco = el('span', 'ri-dico'), dTxt = el('span', 'ri-dtxt'); doing.append(dIco, dTxt);
   top.append(name); main.append(top, doing);
@@ -198,7 +198,7 @@ function renderRail() {
     if (!r) { r = railRow(s); railRows.set(s.id, r); }
     const color = colorOf(s), cur = String(s.id === state.selectedId);
     r.b.dataset.status = s.status; r.b.dataset.stuck = s.stuck && s.status !== 'rest' ? '1' : ''; r.b.dataset.done = unseenDone.has(s.id) ? '1' : ''; r.b.setAttribute('aria-current', cur); r.av.style.setProperty('--c', color);
-    { const k = agentOf(s); if (r.avTxt.firstChild?.dataset?.agent !== k) { r.avTxt.replaceChildren(agentMark(k)); r.av.title = AGENT_NAME[k]; } }
+    { const k = agentOf(s); if (r.avTxt.firstChild?.dataset?.agent !== k) { r.avTxt.replaceChildren(agentMark(k)); r.av.title = agentName(s); } }
     const nk = dn(s) + '|' + (s.dir || '') + '|' + (s.origin || '') + (s.link ? '|rc' : '');
     if (r.nameKey !== nk) {
       r.nameKey = nk; r.name.textContent = dn(s); r.top.querySelector('.ri-rc')?.remove(); r.top.querySelector('.ri-proj')?.remove();
